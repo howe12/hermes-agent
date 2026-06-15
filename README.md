@@ -1,3 +1,9 @@
+> **🌊 aquarius-psyche 分支** · 这是 [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) 的**机器人+教育领域分支**。所有上游功能 100% 继承；机器人集成和教学特性正在规划中。详见 [AQUARIUS_PSYCHE.md](./AQUARIUS_PSYCHE.md) · [ROBOTICS.md](./ROBOTICS.md) · [EDU.md](./EDU.md) · [CHANGELOG_HOLO.md](./CHANGELOG_HOLO.md)
+>
+> 🤖 **Robotics integration: planning phase** — 设计文档编写中，欢迎参与。详见 [ROBOTICS.md](./ROBOTICS.md)
+
+---
+
 <p align="center">
   <img src="assets/banner.png" alt="Hermes Agent" width="100%">
 </p>
