@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hermes 技能沉淀 · 持续学习的真正机制 · aquarius-psyche</title>
+<meta name="description" content="从 Hermes 源码出发，解释技能沉淀 2 个触发点、_SKILL_REVIEW_PROMPT 全文、4 种更新方式优先级、3 个真实场景。">
+<style>
+:root {
+  --ink: #0f172a;
+  --ink-2: #334155;
+  --ink-3: #64748b;
+  --ink-4: #94a3b8;
+  --paper: #fafaf7;
+  --paper-2: #f1f1ec;
+  --paper-3: #e7e6df;
+  --line: #d6d4c8;
+  --line-2: #b8b6a8;
+  --accent: #1e6091;
+  --accent-2: #154c75;
+  --accent-soft: #dbe9f3;
+  --warm: #a04a1d;
+  --warm-soft: #f6e7d8;
+  --ok: #1f6b3c;
+  --ok-soft: #dcecdf;
+  --q: #8e2a3b;
+  --q-soft: #f3dde0;
+  --code-bg: #1a2233;
+  --code-fg: #e5edf7;
+  --code-key: #93c5fd;
+  --code-str: #fcd34d;
+  --code-fn: #c4b5fd;
+  --code-com: #64748b;
+  --code-num: #fda4af;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --serif: "Iowan Old Style", "Source Han Serif SC", "Songti SC", "STSong", serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: var(--sans); color: var(--ink); background: var(--paper); font-size: 16px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-soft); color: var(--accent-2); }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .15s; }
+a:hover { border-bottom-color: var(--accent); }
+code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
+:not(pre) > code { padding: 1px 6px; background: var(--paper-2); border-radius: 3px; font-size: 14px; color: var(--accent-2); }
+.wrap { max-width: 920px; margin: 0 auto; padding: 0 28px; }
+section { padding: 72px 0; border-top: 1px solid var(--line); }
+section:first-of-type { border-top: none; }
+section h2 { font-family: var(--serif); font-size: 32px; font-weight: 500; letter-spacing: -.01em; margin: 0 0 8px; color: var(--ink); }
+section .lede { font-size: 16px; color: var(--ink-2); margin: 0 0 36px; max-width: 720px; }
+section .num { display: inline-block; font-family: var(--mono); font-size: 12px; color: var(--ink-3); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 14px; }
+section h3 { font-family: var(--serif); font-size: 22px; font-weight: 500; color: var(--ink); margin: 36px 0 12px; }
+section h4 { font-size: 16px; font-weight: 600; color: var(--ink); margin: 24px 0 10px; }
+section p { margin: 0 0 16px; }
+section ul, section ol { margin: 0 0 16px; padding-left: 22px; }
+section li { margin-bottom: 6px; }
+
+.toc { background: var(--paper-2); border: 1px solid var(--line); border-radius: 8px; padding: 20px 24px; margin: 32px 0 0; }
+.toc h4 { font-size: 12px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--ink-3); margin: 0 0 12px; font-weight: 500; }
+.toc ol { margin: 0; padding-left: 20px; }
+.toc li { font-size: 14px; color: var(--ink-2); margin-bottom: 4px; }
+.toc li::marker { color: var(--ink-3); font-family: var(--mono); }
+.toc a { color: var(--ink-2); }
+.toc a:hover { color: var(--accent); }
+
+.hero { padding: 80px 0 40px; }
+.hero .label { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--ink-3); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 24px; }
+.hero .label .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warm); box-shadow: 0 0 0 3px var(--warm-soft); animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+.hero h1 { font-family: var(--serif); font-size: 48px; font-weight: 500; line-height: 1.1; letter-spacing: -.02em; margin: 0 0 18px; color: var(--ink); }
+.hero .tag { font-size: 18px; color: var(--ink-2); max-width: 720px; margin: 0 0 8px; }
+.hero .sub { font-size: 15px; color: var(--ink-3); max-width: 720px; margin: 0 0 28px; }
+
+pre { background: var(--code-bg); color: var(--code-fg); padding: 20px 22px; border-radius: 8px; overflow-x: auto; font-family: var(--mono); font-size: 13.5px; line-height: 1.65; margin: 16px 0 20px; border: 1px solid #2a3450; }
+pre .k { color: var(--code-key); }
+pre .s { color: var(--code-str); }
+pre .f { color: var(--code-fn); }
+pre .c { color: var(--code-com); font-style: italic; }
+pre .v { color: var(--code-num); }
+pre .o { color: #94a3b8); }
+pre .h { color: #c4b5fd; font-weight: 600; }
+
+.t { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 14px; }
+.t th, .t td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+.t th { font-weight: 600; color: var(--ink); background: var(--paper-2); font-size: 13px; }
+.t td { color: var(--ink-2); vertical-align: top; }
+.t tr:last-child td { border-bottom: 2px solid var(--line-2); }
+.t .yn { font-family: var(--mono); font-size: 12px; padding: 2px 6px; border-radius: 3px; }
+.t .yn.y { background: var(--ok-soft); color: var(--ok); }
+.t .yn.f { background: var(--warm-soft); color: var(--warm); }
+
+.callout { background: var(--paper-2); border: 1px solid var(--line); border-radius: 8px; padding: 18px 22px; margin: 16px 0 20px; font-size: 14.5px; }
+.callout.warn { background: var(--warm-soft); border-color: var(--warm); }
+.callout.ok { background: var(--ok-soft); border-color: var(--ok); }
+.callout.q { background: var(--accent-soft); border-color: var(--accent); }
+.callout b { color: var(--ink); }
+.callout.warn b { color: var(--warm); }
+.callout.ok b { color: var(--ok); }
+.callout.q b { color: var(--accent-2); }
+
+.triggers { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+.triggers .t-card { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
+.triggers .t-card.hot { background: var(--warm-soft); border-color: var(--warm); }
+.triggers .t-card.cold { background: var(--accent-soft); border-color: var(--accent); }
+.triggers .t-card .n { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 6px; }
+.triggers .t-card.hot .n { color: var(--warm); }
+.triggers .t-card.cold .n { color: var(--accent-2); }
+.triggers .t-card .t { font-family: var(--serif); font-size: 18px; color: var(--ink); margin-bottom: 10px; }
+.triggers .t-card .d { font-size: 13px; color: var(--ink-2); }
+.triggers .t-card .freq { margin-top: 10px; font-family: var(--mono); font-size: 12px; padding: 4px 8px; background: var(--paper-2); border-radius: 3px; display: inline-block; }
+.triggers .t-card.hot .freq { background: var(--warm); color: white; }
+.triggers .t-card.cold .freq { background: var(--accent); color: white; }
+
+.flow { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 20px 0 24px; padding: 18px; background: var(--paper-2); border-radius: 8px; border: 1px solid var(--line); }
+.flow .node { background: var(--paper); border: 1px solid var(--line-2); border-radius: 6px; padding: 8px 14px; font-size: 13px; color: var(--ink); font-family: var(--mono); }
+.flow .node.b { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-2); }
+.flow .node.w { background: var(--warm-soft); border-color: var(--warm); color: var(--warm); }
+.flow .node.g { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.flow .arrow { color: var(--ink-3); font-family: var(--mono); }
+
+.script { background: var(--paper-2); border-radius: 8px; padding: 4px; margin: 16px 0 24px; border: 1px solid var(--line); }
+.script .scene { padding: 14px 20px; border-bottom: 1px dashed var(--line-2); }
+.script .scene:last-child { border-bottom: none; }
+.script .scene .who { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--ink-3); margin-bottom: 4px; }
+.script .scene .who.s { color: var(--ok); }
+.script .scene .who.a { color: var(--accent-2); }
+.script .scene .who.bg { color: var(--warm); }
+.script .scene .text { font-size: 14.5px; color: var(--ink); }
+
+footer { padding: 36px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); }
+footer .row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+
+@media (max-width: 800px) {
+  .hero h1 { font-size: 32px; }
+  .triggers { grid-template-columns: 1fr; }
+  section h2 { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .hero .label .dot { animation: none; } }
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="wrap">
+    <div class="label"><span class="dot"></span>aquarius-psyche · 附录 B · 源码级解析</div>
+    <h1>Hermes 技能沉淀 · 持续学习的真正机制</h1>
+    <p class="tag">长期记忆是"存档"，技能沉淀才是"学习"。讲清 Hermes 怎么从对话里提炼出可复用的 skill，以及两个真实触发点。</p>
+    <p class="sub">附在主阅读手册之后。约 12 分钟。</p>
+
+    <div class="toc">
+      <h4>目录</h4>
+      <ol>
+        <li><a href="#why">为什么"技能沉淀"才是持续学习</a></li>
+        <li><a href="#triggers">2 个独立触发点 · 一热一冷</a></li>
+        <li><a href="#trigger1">触发 1 · 每轮对话后 · 后台线程（最频繁）</a></li>
+        <li><a href="#trigger2">触发 2 · CLI 启动时 · curator 清理</a></li>
+        <li><a href="#prompt">_SKILL_REVIEW_PROMPT 全文与解读</a></li>
+        <li><a href="#priority">4 种更新方式 · 优先级</a></li>
+        <li><a href="#signals">4 类信号 · 任意一个就动手</a></li>
+        <li><a href="#case">完整案例 · 机械臂 PID 抖动</a></li>
+        <li><a href="#guardrails">3 道保险 · 防误伤</a></li>
+        <li><a href="#implications">对机器人 + 课程库的实操影响</a></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 1 ============ -->
+<section id="why">
+  <div class="wrap">
+    <div class="num">§ 1</div>
+    <h2>为什么"技能沉淀"才是持续学习</h2>
+    <p>你在 Q1 问"Hermes 的持续学习是不是你想要的"。这个问题其实有两个不同的技术：</p>
+
+    <div class="triggers">
+      <div class="t-card">
+        <div class="n">L1 · 长期记忆（附录 A）</div>
+        <div class="t">FTS5 全文检索</div>
+        <div class="d">所有对话自动进 SQLite 数据库。LLM 调 <span class="mono">session_search</span> 就能搜历史。</div>
+        <div class="freq">"存档" — 不主动提炼</div>
+      </div>
+      <div class="t-card hot">
+        <div class="n">L2 · 技能沉淀（附录 B）</div>
+        <div class="t">SKILL.md 自动写盘</div>
+        <div class="d">对话结束后后台线程分析，把经验提炼成 <span class="mono">~/.hermes/skills/&lt;name&gt;/SKILL.md</span>。</div>
+        <div class="freq">"学习" — 主动提炼</div>
+      </div>
+    </div>
+
+    <div class="callout q">
+      <b>关键区别：</b>长期记忆是<em>被动</em>的——你搜什么它就给你什么。技能沉淀是<em>主动</em>的——它<em>判断</em>这次对话里有没有值得固化的经验，<em>主动写盘</em>。下次同类问题 LLM 直接调这个 skill，不用重新发明。
+    </div>
+
+    <p>所以如果你 Q1 的答案是"我想要持续学习"，那 80% 的价值在技能沉淀，长期记忆只是基础。</p>
+  </div>
+</section>
+
+<!-- ============ § 2 ============ -->
+<section id="triggers">
+  <div class="wrap">
+    <div class="num">§ 2</div>
+    <h2>2 个独立触发点 · 一热一冷</h2>
+    <p>技能沉淀有 2 个触发点，<b>目的完全不同</b>：</p>
+
+    <table class="t">
+      <tr>
+        <th></th>
+        <th>触发 1 · 每轮对话后</th>
+        <th>触发 2 · CLI 启动时</th>
+      </tr>
+      <tr>
+        <td>位置</td>
+        <td><span class="mono">agent/turn_finalizer.py:376-398</span></td>
+        <td><span class="mono">cli.py:11039</span> + <span class="mono">agent/curator.py:1817</span></td>
+      </tr>
+      <tr>
+        <td>频率</td>
+        <td><b>每轮都可能</b>（高）</td>
+        <td>默认 <b>7 天 1 次</b>（低）</td>
+      </tr>
+      <tr>
+        <td>目的</td>
+        <td><b>写新东西</b>（新 skill、patch、support file）</td>
+        <td><b>清理旧东西</b>（stale → archive）</td>
+      </tr>
+      <tr>
+        <td>机制</td>
+        <td>fork AIAgent daemon 线程</td>
+        <td>fork AIAgent daemon 线程</td>
+      </tr>
+      <tr>
+        <td>用户感知</td>
+        <td>有时终端闪一行 <span class="mono">💾 ...</span> 摘要</td>
+        <td>几乎不感知（启动 1-2s 后台跑）</td>
+      </tr>
+      <tr>
+        <td>谁能用</td>
+        <td>所有会话（CLI / 飞书 / Telegram）</td>
+        <td>CLI 启动时（gateway 启动也会调）</td>
+      </tr>
+    </table>
+
+    <div class="callout warn">
+      <b>注意：</b>"频率"和"目的"是两套独立的齿轮。<br>
+      · 触发 1 高频 → <b>累库</b>（每轮都可能加东西）<br>
+      · 触发 2 低频 → <b>瘦身</b>（每周清理一次）<br>
+      二者配合，技能库既<em>越来越丰富</em>又<em>不臃肿</em>。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 3 ============ -->
+<section id="trigger1">
+  <div class="wrap">
+    <div class="num">§ 3</div>
+    <h2>触发 1 · 每轮对话后 · 后台线程</h2>
+    <p>文件 <span class="mono">agent/turn_finalizer.py:376-398</span>。每轮对话正常结束后，<b>在响应交付给用户之后</b>，会做这个判断：</p>
+
+<pre><span class="c"># turn_finalizer.py 真实代码（行 376-398）</span>
+_should_review_skills = <span class="k">False</span>
+<span class="k">if</span> (agent._skill_nudge_interval > <span class="v">0</span>
+        <span class="k">and</span> agent._iters_since_skill >= agent._skill_nudge_interval
+        <span class="k">and</span> <span class="s">"skill_manage"</span> <span class="k">in</span> agent.valid_tool_names):
+    _should_review_skills = <span class="k">True</span>
+    agent._iters_since_skill = <span class="v">0</span>
+
+<span class="c"># 条件满足后起后台线程</span>
+<span class="k">if</span> final_response <span class="k">and not</span> interrupted <span class="k">and</span> (_should_review_memory <span class="k">or</span> _should_review_skills):
+    <span class="k">try</span>:
+        agent._spawn_background_review(
+            messages_snapshot=<span class="f">list</span>(messages),
+            review_memory=_should_review_memory,
+            review_skills=_should_review_skills,
+        )
+    <span class="k">except</span> Exception:
+        <span class="k">pass</span>  <span class="c"># Background review is best-effort</span></pre>
+
+    <h3>3 个 AND 条件</h3>
+    <ol>
+      <li><b>_skill_nudge_interval &gt; 0</b> —— 开关开着。默认多少？看下面。</li>
+      <li><b>_iters_since_skill &gt;= _skill_nudge_interval</b> —— <em>本轮用了多少次工具调用</em>超过阈值</li>
+      <li><b>"skill_manage" in valid_tool_names</b> —— 当前 session 有 skill 写权限</li>
+    </ol>
+
+    <h3>关键的"它不动用户"</h3>
+    <ul>
+      <li>起的是 <b>daemon 线程</b>，主对话不阻塞</li>
+      <li>如果 interrupted（用户 Ctrl+C），不触发</li>
+      <li>review agent 用 <em>同一个 cached system prompt</em>，命中 LLM 前缀缓存，<b>不污染主会话</b></li>
+      <li>review agent 只能调 <span class="mono">memory</span> 和 <span class="mono">skill_manage</span> 两个工具，<em>工具白名单隔离</em></li>
+    </ul>
+
+    <div class="callout">
+      <b>默认 interval 是多少？</b>我没在源码里找到硬编码默认值（行 372 没有赋值），所以默认是 <span class="mono">AIAgent.__init__</span> 里设的某个值。<b>你可以在 config.yaml 改 <span class="mono">skill_nudge_interval</span></b>。如果你嫌太频繁，设大；嫌学得慢，设小。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 4 ============ -->
+<section id="trigger2">
+  <div class="wrap">
+    <div class="num">§ 4</div>
+    <h2>触发 2 · CLI 启动时 · curator 清理</h2>
+    <p>文件 <span class="mono">cli.py:11039</span> + <span class="mono">agent/curator.py:1817</span>。<b>不是每轮</b>，是 CLI 启动时检查一次。</p>
+
+<pre><span class="c"># cli.py:11039 真实代码（CLI 启动时）</span>
+<span class="k">try</span>:
+    <span class="k">from</span> agent.curator <span class="k">import</span> maybe_run_curator
+    maybe_run_curator(
+        idle_for_seconds=<span class="f">float</span>(<span class="s">"inf"</span>),  <span class="c"># CLI 启动 = 完全 idle</span>
+        on_summary=<span class="k">lambda</span> msg: self._console_print(
+            <span class="s">f"[dim #6b7684]💾 {msg}[/]"</span>
+        ),
+    )
+<span class="k">except</span> Exception:
+    <span class="k">pass</span></pre>
+
+<pre><span class="c"># curator.py:1817 maybe_run_curator 真实代码</span>
+<span class="k">def</span> <span class="f">maybe_run_curator</span>(*, idle_for_seconds=None, on_summary=None):
+    <span class="k">try</span>:
+        <span class="k">if not</span> <span class="f">should_run_now</span>():
+            <span class="k">return None</span>
+        <span class="k">if</span> idle_for_seconds <span class="k">is not None</span>:
+            min_idle_s = <span class="f">get_min_idle_hours</span>() * <span class="v">3600.0</span>
+            <span class="k">if</span> idle_for_seconds <span class="k">&lt;</span> min_idle_s:
+                <span class="k">return None</span>
+        <span class="k">return</span> <span class="f">run_curator_review</span>(on_summary=on_summary)
+    <span class="k">except</span> Exception <span class="k">as</span> e:
+        logger.<span class="f">debug</span>(<span class="s">f"maybe_run_curator failed: {e}"</span>)
+        <span class="k">return None</span></pre>
+
+    <h3>3 个默认常量（curator.py:56-59）</h3>
+<pre><span class="k">DEFAULT_INTERVAL_HOURS</span> = <span class="v">24</span> * <span class="v">7</span>    <span class="c"># 168 小时 = 7 天</span>
+<span class="k">DEFAULT_MIN_IDLE_HOURS</span> = <span class="v">2</span>           <span class="c"># 至少 2 小时 idle 才跑</span>
+<span class="k">DEFAULT_STALE_AFTER_DAYS</span> = <span class="v">30</span>        <span class="c"># 30 天没用 → stale</span>
+<span class="k">DEFAULT_ARCHIVE_AFTER_DAYS</span> = <span class="v">90</span>       <span class="c"># 90 天没用 → archive</span></pre>
+
+    <h3>自动状态转移</h3>
+    <div class="flow">
+      <span class="node g">active</span>
+      <span class="arrow">→ 30 天没用 →</span>
+      <span class="node w">stale</span>
+      <span class="arrow">→ 90 天没用 →</span>
+      <span class="node b">archived</span>
+    </div>
+
+    <h3>关键不变式（curator.py:23-26）</h3>
+    <ul>
+      <li><b>只动 agent-created skill</b>（不碰 bundled/官方）</li>
+      <li><b>永不自动删除</b>——只 archive（可恢复）</li>
+      <li><b>pinned skill 跳过所有自动转移</b></li>
+      <li><b>用辅助 client</b>——绝不污染主会话的 prompt cache</li>
+    </ul>
+
+    <div class="callout ok">
+      <b>首次安装的友好行为：</b>第一次 CLI 启动时 <span class="mono">last_run_at</span> 为空，curator <em>不会立即跑</em>（避免刚装完就重写你的 skill 库），而是 <b>种下一个时间戳，等满 7 天才真的跑第一次</b>。这避免了新装用户的"被自动改了"的体验。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 5 ============ -->
+<section id="prompt">
+  <div class="wrap">
+    <div class="num">§ 5</div>
+    <h2>_SKILL_REVIEW_PROMPT 全文与解读</h2>
+    <p>触发 1 启动后台 review agent 时，<b>塞给 review agent 的指令</b>是这个。原文来自 <span class="mono">agent/background_review.py:45-110</span>。简化版：</p>
+
+<pre><span class="c"># 这是 review agent 看到的 user message</span>
+<span class="s">"Review the conversation above and update the skill library.
+Be ACTIVE — most sessions produce at least one skill update, even
+if small. A pass that does nothing is a missed learning opportunity,
+not a neutral outcome.
+
+Target shape of the library: CLASS-LEVEL skills, each with a rich
+SKILL.md and a references/ directory for session-specific detail.
+Not a long flat list of narrow one-session-one-skill entries.
+
+Signals to look for (any one of these warrants action):
+  • User corrected your style/tone/format/legibility/verbosity.
+  • User corrected your workflow/approach/sequence of steps.
+  • Non-trivial technique, fix, workaround, debugging path emerged.
+  • A skill loaded this session turned out wrong/outdated.
+
+Preference order — prefer the earliest action that fits:
+  1. UPDATE a currently-loaded skill (PATCH the one in play)
+  2. UPDATE an existing umbrella (class-level) skill
+  3. ADD a support file under an existing umbrella
+     (references/ for notes, templates/ for starters, scripts/ for runs)
+  4. CREATE a new class-level umbrella skill
+
+User-preference embedding: when the user expressed style/format/workflow
+preference, the update belongs in the SKILL.md body, not just in memory.
+Memory captures 'who the user is'; skills capture 'how to do this
+class of task for this user'."</span></pre>
+
+    <h3>3 个隐含的设计哲学</h3>
+    <ol>
+      <li><b>"Be ACTIVE"</b> —— 明确要求 review agent <em>不要</em> 没事就退出。"A pass that does nothing is a missed learning opportunity" 这话很严厉，但说明 Hermes 团队在调试中发现了"太被动"的失败模式。</li>
+      <li><b>"CLASS-LEVEL, not session-level"</b> —— 命名必须是 class-level（"ros2-bridge"），不能是 session-level（"fix-today-bug"）。第 4 种方式明文说"If the proposed name only makes sense for today's task, it's wrong"。</li>
+      <li><b>SKILL.md &gt; memory</b> —— <em>用户偏好</em>必须写进 SKILL.md，不只是 memory。原因：下次 session 启动时 memory 是注入到 system prompt 的，但 SKILL.md 是按需加载的——偏好必须 <em>按需加载</em>才正确（不同任务场景用不同偏好）。</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ § 6 ============ -->
+<section id="priority">
+  <div class="wrap">
+    <div class="num">§ 6</div>
+    <h2>4 种更新方式 · 优先级</h2>
+    <p>review agent 拿到对话后，<b>按这个优先级</b>决定写什么。这是精心设计的——大多数更新走 1-2-3（已有 skill），很少走 4（新建）。</p>
+
+    <table class="t">
+      <tr>
+        <th>优先级</th>
+        <th>动作</th>
+        <th>触发条件</th>
+        <th>写盘路径</th>
+      </tr>
+      <tr>
+        <td><b>①</b></td>
+        <td>PATCH <em>当前已加载的</em> skill</td>
+        <td>对话里 <span class="mono">/skill-name</span> 调过某个 skill，或 <span class="mono">skill_view</span> 读过</td>
+        <td><span class="mono">~/.hermes/skills/&lt;name&gt;/SKILL.md</span>（修改）</td>
+      </tr>
+      <tr>
+        <td><b>②</b></td>
+        <td>PATCH <em>已有的</em> umbrella skill</td>
+        <td>没有加载但有同类 skill 覆盖</td>
+        <td><span class="mono">~/.hermes/skills/&lt;name&gt;/SKILL.md</span>（修改）</td>
+      </tr>
+      <tr>
+        <td><b>③</b></td>
+        <td>ADD support file</td>
+        <td>该加 <span class="mono">references/&lt;topic&gt;.md</span> / <span class="mono">templates/&lt;name&gt;</span> / <span class="mono">scripts/&lt;name&gt;</span></td>
+        <td>3 种子目录</td>
+      </tr>
+      <tr>
+        <td><b>④</b></td>
+        <td>CREATE NEW skill</td>
+        <td>上面都不合适，<em>且</em>是 class-level 命名</td>
+        <td><span class="mono">~/.hermes/skills/&lt;new-name&gt;/SKILL.md</span>（新建）</td>
+      </tr>
+    </table>
+
+    <div class="callout">
+      <b>为什么"加载过"最重要？</b><br>
+      因为加载过 = LLM <em>已经认为这个 skill 相关</em>。往它身上加东西，<b>比新建一个"理论上相关"的 skill</b> 命中下次场景的概率高得多。Hermes 团队把这一点提升到了"first-class"——优先级 1 不需要 LLM 重新判断相关性。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 7 ============ -->
+<section id="signals">
+  <div class="wrap">
+    <div class="num">§ 7</div>
+    <h2>4 类信号 · 任意一个就动手</h2>
+    <p>review agent 拿到对话后会扫这 4 类信号。<b>任一触发</b>就动手写 skill。</p>
+
+    <h3>信号 1 · 用户纠正了风格/格式</h3>
+    <p>"stop doing X"、"this is too verbose"、"don't format like this"、"why are you explaining"、"just give me the answer"、"you always do Y and I hate it"、或显式"remember this"。<b>这是 FIRST-CLASS skill 信号</b>，不只是 memory 信号。</p>
+
+    <div class="callout q">
+      <b>为什么 style/format 进 skill 不进 memory：</b>memory 是关于"你是谁、当前状态"，skill 是关于"怎么为这个用户做这类事"。<em>风格偏好属于后者</em>——同一类任务下次出现时，要按上次纠正的方式做。
+    </div>
+
+    <h3>信号 2 · 用户纠正了工作流</h3>
+    <p>"no, first do X then Y, not Y then X"、"before running that, check Z"——编码为 SKILL.md 的 pitfall 或显式步骤。</p>
+
+    <h3>信号 3 · 出现了非平凡的技术/修复</h3>
+    <p>debug 路径、workaround、tool 用法、API quirk——任何未来 session 能受益的东西。捕获。</p>
+
+    <h3>信号 4 · 已加载的 skill 居然是错的</h3>
+    <p>最重要的一条。如果一个 skill <em>已经</em>被这次对话加载/调过，但发现它<em>过时/缺步骤/错了</em>——<b>立刻 patch 它</b>，不要等下次。</p>
+  </div>
+</section>
+
+<!-- ============ § 8 ============ -->
+<section id="case">
+  <div class="wrap">
+    <div class="num">§ 8</div>
+    <h2>完整案例 · 机械臂 PID 抖动</h2>
+    <p>拿你的 sagittarius_class 课里"调 PID"环节做一个完整走查。</p>
+
+    <h3>对话上下文</h3>
+    <div class="script">
+      <div class="scene">
+        <div class="who s">学生</div>
+        <div class="text">机械臂 joint1 一直抖动，ros2 topic 看 position 在 0.001 范围里高频抖。</div>
+      </div>
+      <div class="scene">
+        <div class="who a">agent</div>
+        <div class="text">我查一下控制器配置……<em>[调 terminal 跑 ros2 param list / ros2 control list_controllers]</em>……<br>找到了：joint1 的 PID 控制器 P=0.1。<em>对负载大的关节太低了</em>。建议改 P=1.0。</div>
+      </div>
+      <div class="scene">
+        <div class="who s">学生</div>
+        <div class="text">改成 1.0 试试……好了，不抖了。</div>
+      </div>
+      <div class="scene">
+        <div class="who a">agent</div>
+        <div class="text">✅ 稳了。我把这个经验沉淀到 skill 里，下次你再遇到类似问题不用重新发明。</div>
+      </div>
+    </div>
+
+    <h3>触发 1 跑完一轮后</h3>
+    <div class="flow">
+      <span class="node">学生说完"好了"</span>
+      <span class="arrow">→</span>
+      <span class="node w">turn_finalizer.py:376 判断</span>
+      <span class="arrow">→</span>
+      <span class="node g">_should_review_skills = True</span>
+      <span class="arrow">→</span>
+      <span class="node b">起 daemon 线程 fork AIAgent</span>
+      <span class="arrow">→</span>
+      <span class="node">review agent 读完整对话</span>
+      <span class="arrow">→</span>
+      <span class="node w">评估 4 类信号</span>
+      <span class="arrow">→</span>
+      <span class="node g">信号 3 命中（非平凡修复）</span>
+    </div>
+
+    <h3>review agent 写盘的 4 选 1 决策</h3>
+    <p>按优先级：</p>
+    <ol>
+      <li>对话里调过 <span class="mono">holo-robotics-ros2-bridge</span> 吗？——<b>是</b>（学生用了"ros2 topic"命令）</li>
+      <li>走优先级 ①：<b>PATCH</b> 这个 skill</li>
+      <li>在 SKILL.md 的 "Pitfalls" 段加一条：<em>"joint 抖动 99% 是 PID P 参数太低；sagittarius 关节 1/2/3 经验值 P≥1.0"</em></li>
+    </ol>
+
+    <h3>写盘后的实际产物</h3>
+<pre><span class="c"># 写到哪里：~/.hermes/skills/holo-robotics-ros2-bridge/SKILL.md</span>
+
+<span class="c">## Pitfalls</span>
+
+<span class="c">### joint 持续高频抖动</span>
+<span class="c">- 99% 是 PID 控制器 P 参数太低</span>
+<span class="c">- 检查：ros2 control list_controllers + ros2 param get /sgr532/joint1_position_controller pid.p</span>
+<span class="c">- 经验值：sagittarius 关节 1/2/3 需 P >= 1.0；关节 4/5/6 需 P >= 0.5</span>
+<span class="c">- 改了之后用 ros2 topic echo 看 position，标准差 < 0.001 算稳</span></pre>
+
+    <h3>下次类似场景</h3>
+    <p>另一个学生问"机械臂抖动"，LLM 加载 <span class="mono">holo-robotics-ros2-bridge</span>，SKILL.md 里已经有这条 pitfall —— <b>第一次回答就提到"检查 PID P 参数"</b>，不用重新发明。</p>
+
+    <div class="callout ok">
+      <b>这就是"持续学习"的物理实现：</b>每轮对话可能产生一段新的经验，被自动写到 SKILL.md。下次同类问题出现，<em>LLM 已经知道这个经验</em>。这个循环跑得越久，skill 库越丰富，agent 越"懂你的领域"。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 9 ============ -->
+<section id="guardrails">
+  <div class="wrap">
+    <div class="num">§ 9</div>
+    <h2>3 道保险 · 防误伤</h2>
+    <p>"自动写盘"听起来很危险——LLM 判断错了怎么办？Hermes 留了 3 道保险：</p>
+
+    <table class="t">
+      <tr>
+        <th>保险</th>
+        <th>机制</th>
+        <th>何时用</th>
+      </tr>
+      <tr>
+        <td><b>1 · 工具白名单</b></td>
+        <td>review agent 只能调 <span class="mono">memory</span> + <span class="mono">skill_manage</span>，其他工具运行时拒绝</td>
+        <td>始终（默认）</td>
+      </tr>
+      <tr>
+        <td><b>2 · <span class="mono">write_approval</span> 开关</b></td>
+        <td><span class="mono">skills.write_approval: true</span> 时所有写盘都进入"staged"——写到 <span class="mono">~/.hermes/pending/skills/</span>，要人审</td>
+        <td>小模型容易误判 / 安全环境 / 想要人审</td>
+      </tr>
+      <tr>
+        <td><b>3 · <span class="mono">guard_agent_created</span> 扫描</b></td>
+        <td>内容扫描器：检测危险模式（rm -rf /、写系统文件、暴露 secret）</td>
+        <td>始终（独立于 approval）</td>
+      </tr>
+    </table>
+
+    <h3>人审流程（write_approval 模式）</h3>
+    <p>开启 <span class="mono">write_approval: true</span> 后，所有 skill 写盘都进 staging：</p>
+<pre><span class="c"># 飞书 / CLI / Telegram 都用同一组命令</span>
+/skills pending                  <span class="c"># 列出所有待审 + 一行摘要</span>
+/skills diff &lt;id&gt;               <span class="c"># 看完整 diff</span>
+/skills approve &lt;id&gt;            <span class="c"># 通过 → 落盘</span>
+/skills reject &lt;id&gt;             <span class="c"># 拒绝 → 丢弃</span>
+/skills approval on              <span class="c"># 开/关 + 持久化</span></pre>
+
+    <div class="callout">
+      <b>对教学场景的建议：</b>前期建议开 <span class="mono">write_approval: true</span>，<em>老师人工 review</em> 每一份新生成的 skill。等模型行为稳定了，再关掉让它自动跑。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 10 ============ -->
+<section id="implications">
+  <div class="wrap">
+    <div class="num">§ 10</div>
+    <h2>对机器人 + 课程库的实操影响</h2>
+
+    <h3>1. 你不用手写 7 个 skill</h3>
+    <p>Hermes 跑 1-2 周后，<b>常用模式会被自动沉淀</b>：</p>
+    <ul>
+      <li>学生问"ROS2 domain ID 怎么设" → 自动生成 <span class="mono">holo-robotics-ros2-config</span> skill</li>
+      <li>学生问"joint 抖动" → 自动沉淀到 <span class="mono">holo-robotics-ros2-bridge</span></li>
+      <li>学生问"slam 怎么建图" → 自动沉淀到 <span class="mono">holo-robotics-slam</span></li>
+    </ul>
+
+    <h3>2. 你应该写什么</h3>
+    <p>只写"骨架 + 入口"：</p>
+    <ul>
+      <li><b>3-5 个 class-level umbrella skill</b>（holo-robotics-ros2-bridge / holo-robotics-moveit / holo-robotics-slam / holo-edu-course-rag / holo-edu-tutor）</li>
+      <li>每个的 SKILL.md <em>只写触发条件 + 主流程</em>，<b>不写细节</b>——细节由触发 1 自动填</li>
+      <li>你 override 或 pin（<span class="mono">~/.hermes/skills/&lt;name&gt;/.pinned</span>）的 skill curator 不会动</li>
+    </ul>
+
+    <h3>3. 错例库怎么搭</h3>
+    <p>学生答错的题，<em>被 Hermes 写到 memory 还是 SKILL.md</em>？</p>
+    <ul>
+      <li>memory：<em>这个学生</em>错了什么（个性化）</li>
+      <li>SKILL.md：<em>这类学生</em>容易错什么（通用化）</li>
+    </ul>
+    <p>Hermes 会自动判断。如果一个错例 3 个学生都栽了，<em>review agent 会把它从 memory 升级到 SKILL.md</em>（加进对应课的"教学 pitfall"段）。</p>
+
+    <h3>4. 时间线预期</h3>
+    <table class="t">
+      <tr><th>阶段</th><th>现象</th><th>说明</th></tr>
+      <tr><td>第 1 周</td><td>几乎没变化</td><td>首次安装，curator 不会跑，触发 1 也才刚开始计数</td></tr>
+      <tr><td>第 2-4 周</td><td>偶尔看到 <span class="mono">💾 Patched holo-robotics-ros2-bridge</span></td><td>触发 1 开始有动作，但很挑剔</td></tr>
+      <tr><td>第 5-8 周</td><td>skill 库 7-15 个</td><td>trigger 1 高频 + 第一次 curator 跑</td></tr>
+      <tr><td>第 9 周起</td><td>开始有 stale / archive</td><td>curator 开始清理</td></tr>
+      <tr><td>3 个月后</td><td>稳定的"越用越聪明"循环</td><td>写、读、清理三件套都稳定</td></tr>
+    </table>
+
+    <div class="callout q">
+      <b>回到主阅读手册：</b>读完附录 A + B，你应该能完全回答 Q1：<em>Hermes 的"持续学习"对你意味着什么</em>。<br>
+      答案大概率是：<b>值得。</b>不是因为它的 LLM 强（我们用 DeepSeek），而是因为这套 <em>沉淀 + 检索 + 清理</em> 机制是工程化的、有代码保证的。
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="row">
+      <div>附录 B · 源码级解析 · 2026.06.13</div>
+      <div>回 <a href="../">主阅读手册</a> · 附录 <a href="./index.html">A：FTS5</a></div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
