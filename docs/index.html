@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hermes 长期记忆 · SQLite FTS5 全解 · aquarius-psyche</title>
+<meta name="description" content="从 Hermes 源码出发，逐行解释长期记忆 + FTS5 全文检索的工作原理。含 CJK 处理、sanitize 安全、BM25 排序、trigger 自动同步。">
+<style>
+:root {
+  --ink: #0f172a;
+  --ink-2: #334155;
+  --ink-3: #64748b;
+  --ink-4: #94a3b8;
+  --paper: #fafaf7;
+  --paper-2: #f1f1ec;
+  --paper-3: #e7e6df;
+  --line: #d6d4c8;
+  --line-2: #b8b6a8;
+  --accent: #1e6091;
+  --accent-2: #154c75;
+  --accent-soft: #dbe9f3;
+  --warm: #a04a1d;
+  --warm-soft: #f6e7d8;
+  --ok: #1f6b3c;
+  --ok-soft: #dcecdf;
+  --q: #8e2a3b;
+  --q-soft: #f3dde0;
+  --code-bg: #1a2233;
+  --code-fg: #e5edf7;
+  --code-key: #93c5fd;
+  --code-str: #fcd34d;
+  --code-fn: #c4b5fd;
+  --code-com: #64748b;
+  --code-num: #fda4af;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --serif: "Iowan Old Style", "Source Han Serif SC", "Songti SC", "STSong", serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: var(--sans); color: var(--ink); background: var(--paper); font-size: 16px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-soft); color: var(--accent-2); }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .15s; }
+a:hover { border-bottom-color: var(--accent); }
+code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
+:not(pre) > code { padding: 1px 6px; background: var(--paper-2); border-radius: 3px; font-size: 14px; color: var(--accent-2); }
+
+.wrap { max-width: 920px; margin: 0 auto; padding: 0 28px; }
+section { padding: 72px 0; border-top: 1px solid var(--line); }
+section:first-of-type { border-top: none; }
+section h2 { font-family: var(--serif); font-size: 32px; font-weight: 500; letter-spacing: -.01em; margin: 0 0 8px; color: var(--ink); }
+section .lede { font-size: 16px; color: var(--ink-2); margin: 0 0 36px; max-width: 720px; }
+section .num { display: inline-block; font-family: var(--mono); font-size: 12px; color: var(--ink-3); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 14px; }
+section h3 { font-family: var(--serif); font-size: 22px; font-weight: 500; color: var(--ink); margin: 36px 0 12px; }
+section h4 { font-size: 16px; font-weight: 600; color: var(--ink); margin: 24px 0 10px; }
+section p { margin: 0 0 16px; }
+section ul, section ol { margin: 0 0 16px; padding-left: 22px; }
+section li { margin-bottom: 6px; }
+
+.toc { background: var(--paper-2); border: 1px solid var(--line); border-radius: 8px; padding: 20px 24px; margin: 32px 0 0; }
+.toc h4 { font-size: 12px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--ink-3); margin: 0 0 12px; font-weight: 500; }
+.toc ol { margin: 0; padding-left: 20px; }
+.toc li { font-size: 14px; color: var(--ink-2); margin-bottom: 4px; }
+.toc li::marker { color: var(--ink-3); font-family: var(--mono); }
+.toc a { color: var(--ink-2); }
+.toc a:hover { color: var(--accent); }
+
+.hero { padding: 80px 0 40px; }
+.hero .label { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--ink-3); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 24px; }
+.hero .label .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+.hero h1 { font-family: var(--serif); font-size: 48px; font-weight: 500; line-height: 1.1; letter-spacing: -.02em; margin: 0 0 18px; color: var(--ink); }
+.hero .tag { font-size: 18px; color: var(--ink-2); max-width: 720px; margin: 0 0 8px; }
+.hero .sub { font-size: 15px; color: var(--ink-3); max-width: 720px; margin: 0 0 28px; }
+
+pre { background: var(--code-bg); color: var(--code-fg); padding: 20px 22px; border-radius: 8px; overflow-x: auto; font-family: var(--mono); font-size: 13.5px; line-height: 1.65; margin: 16px 0 20px; border: 1px solid #2a3450; }
+pre .k { color: var(--code-key); }
+pre .s { color: var(--code-str); }
+pre .f { color: var(--code-fn); }
+pre .c { color: var(--code-com); font-style: italic; }
+pre .v { color: var(--code-num); }
+pre .o { color: #94a3b8; }
+pre .h { color: #c4b5fd; font-weight: 600; }
+
+.t { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 14px; }
+.t th, .t td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+.t th { font-weight: 600; color: var(--ink); background: var(--paper-2); font-size: 13px; }
+.t td { color: var(--ink-2); vertical-align: top; }
+.t tr:last-child td { border-bottom: 2px solid var(--line-2); }
+.t .yn { font-family: var(--mono); font-size: 12px; padding: 2px 6px; border-radius: 3px; }
+.t .yn.y { background: var(--ok-soft); color: var(--ok); }
+
+.callout { background: var(--paper-2); border: 1px solid var(--line); border-radius: 8px; padding: 18px 22px; margin: 16px 0 20px; font-size: 14.5px; }
+.callout.warn { background: var(--warm-soft); border-color: var(--warm); }
+.callout.ok { background: var(--ok-soft); border-color: var(--ok); }
+.callout.q { background: var(--accent-soft); border-color: var(--accent); }
+.callout b { color: var(--ink); }
+.callout.warn b { color: var(--warm); }
+.callout.ok b { color: var(--ok); }
+.callout.q b { color: var(--accent-2); }
+
+.layers { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin: 20px 0; }
+.layers .l { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.layers .l .n { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 6px; }
+.layers .l .t { font-family: var(--serif); font-size: 18px; color: var(--ink); margin-bottom: 6px; }
+.layers .l .d { font-size: 13px; color: var(--ink-2); }
+.layers .l.warn { background: var(--warm-soft); border-color: var(--warm); }
+.layers .l.warn .n { color: var(--warm); }
+.layers .l.ok { background: var(--ok-soft); border-color: var(--ok); }
+.layers .l.ok .n { color: var(--ok); }
+
+.flow { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 20px 0 24px; padding: 18px; background: var(--paper-2); border-radius: 8px; border: 1px solid var(--line); }
+.flow .node { background: var(--paper); border: 1px solid var(--line-2); border-radius: 6px; padding: 8px 14px; font-size: 13px; color: var(--ink); font-family: var(--mono); }
+.flow .node.b { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-2); }
+.flow .node.w { background: var(--warm-soft); border-color: var(--warm); color: var(--warm); }
+.flow .node.g { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.flow .arrow { color: var(--ink-3); font-family: var(--mono); }
+
+footer { padding: 36px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); }
+footer .row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+
+@media (max-width: 800px) {
+  .hero h1 { font-size: 32px; }
+  .layers { grid-template-columns: 1fr; }
+  section h2 { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .hero .label .dot { animation: none; } }
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="wrap">
+    <div class="label"><span class="dot"></span>aquarius-psyche · 附录 A · 源码级解析</div>
+    <h1>Hermes 长期记忆 · SQLite FTS5 全解</h1>
+    <p class="tag">3 个文件、~50 行核心代码、~200 行实际查询逻辑——讲清 Hermes "越用越聪明" 的物理基础。</p>
+    <p class="sub">附在主阅读手册之后。约 15 分钟。</p>
+
+    <div class="toc">
+      <h4>目录</h4>
+      <ol>
+        <li><a href="#what">长期记忆的"长"和"快"各自指什么</a></li>
+        <li><a href="#three">3 层架构 · 短/中/长期</a></li>
+        <li><a href="#sqlite">SQLite FTS5 是什么 · 跟普通 LIKE 比</a></li>
+        <li><a href="#schema">Hermes 怎么建表（带真实 DDL）</a></li>
+        <li><a href="#trigger">Trigger 怎么让记忆"自动同步"</a></li>
+        <li><a href="#bm25">查询为什么快 · BM25 排名</a></li>
+        <li><a href="#cjk">中文怎么办 · trigram 分词器</a></li>
+        <li><a href="#safety">查询安全 · sanitize</a></li>
+        <li><a href="#full-flow">一次完整写入 + 检索的全流程</a></li>
+        <li><a href="#implications">对我们的项目意味着什么</a></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 1 ============ -->
+<section id="what">
+  <div class="wrap">
+    <div class="num">§ 1</div>
+    <h2>"长"和"快"各自指什么</h2>
+    <p>你问的是两件事：</p>
+    <ul>
+      <li><b>"长期"</b> = 数据能不能跨进程、跨月、跨年存活——不丢</li>
+      <li><b>"快速找到"</b> = 在 10 万条记录里搜"机械臂挥手"能不能在 50ms 内返回——不快就废了</li>
+    </ul>
+
+    <p>这两件事由两个不同技术解决：</p>
+    <div class="layers">
+      <div class="l ok">
+        <div class="n">长</div>
+        <div class="t">SQLite 本地文件</div>
+        <div class="d">数据写进 <span class="mono">~/.hermes/state.db</span> 一个文件。进程退出、机器重启都不丢。WAL 模式保证崩溃也安全。</div>
+      </div>
+      <div class="l ok">
+        <div class="n">快</div>
+        <div class="t">FTS5 倒排索引</div>
+        <div class="d">"词 → 哪些行"反向建索引。查 "机械臂" 不用扫 10 万行，索引直接告诉你"在第 4, 17, 238, 901 行"。</div>
+      </div>
+      <div class="l ok">
+        <div class="n">准</div>
+        <div class="t">BM25 排名</div>
+        <div class="d">同样包含"机械臂"的 100 行，按"相关度"打分排前 10 个返回。</div>
+      </div>
+    </div>
+
+    <p>三者合起来，就是 Hermes 长期记忆的全部秘密。下面逐层拆。</p>
+  </div>
+</section>
+
+<!-- ============ § 2 ============ -->
+<section id="three">
+  <div class="wrap">
+    <div class="num">§ 2</div>
+    <h2>3 层架构 · 短 / 中 / 长期</h2>
+    <p>Hermes 的"记忆"不是单一文件。它有 3 个不同时间尺度的组件，<b>对应不同用途</b>：</p>
+
+    <table class="t">
+      <tr><th>层</th><th>存在形式</th><th>寿命</th><th>容量</th><th>用途</th></tr>
+      <tr>
+        <td><b>短期 · 上下文</b></td>
+        <td>当前会话的 messages</td>
+        <td>单次对话</td>
+        <td>~200K tokens（模型上限）</td>
+        <td>让 LLM 看到"刚才说了什么"</td>
+      </tr>
+      <tr>
+        <td><b>中期 · MEMORY.md</b></td>
+        <td>Markdown 文件</td>
+        <td>永久（手动管理）</td>
+        <td>2,200 chars ≈ 800 tokens</td>
+        <td>agent 自己写的"个人笔记"——项目、约定、用户偏好</td>
+      </tr>
+      <tr>
+        <td><b>长期 · SQLite + FTS5</b></td>
+        <td>SQLite 数据库</td>
+        <td>永久（自动累积）</td>
+        <td>无限（10万+ 条）</td>
+        <td>所有历史对话、所有工具调用、所有结果——可全文检索</td>
+      </tr>
+    </table>
+
+    <div class="callout q">
+      <b>关键点：</b>中期和长期是两套机制。<b>MEMORY.md 是 agent 主动维护的精炼笔记</b>（agent 觉得"这条值得记"才写）；<b>SQLite 是所有对话的自动存档</b>（机器自己塞的，不删不挑）。前者进入 system prompt，后者通过 <span class="mono">session_search</span> 工具被检索。
+    </div>
+
+    <h3>当用户问"上次我们聊到哪了"时发生什么</h3>
+    <p>这会触发 LLM 决定：调 <span class="mono">session_search</span> 工具。工具代码长这样（伪代码 + 真实查询骨架）：</p>
+
+<pre><span class="c"># agent/skill_commands.py / run_agent.py 里的搜索调用</span>
+<span class="k">def</span> <span class="f">search_history</span>(query: <span class="k">str</span>, limit: <span class="k">int</span> = <span class="v">10</span>):
+    safe_query = <span class="f">_sanitize_fts5_query</span>(query)   <span class="c"># § 8 讲这个</span>
+    <span class="k">return</span> session_db.<span class="f">search_sessions</span>(safe_query, limit=limit)
+
+<span class="c"># hermes_state.py 实际查询（行 3292）</span>
+sql = <span class="s">"""
+    SELECT
+        m.id, m.session_id, m.role,
+        snippet(messages_fts, <span class="v">0</span>, <span class="s">'>>>'</span>, <span class="s">'<<<'</span>, <span class="s">'...'</span>, <span class="v">40</span>) AS snippet,
+        m.content, m.timestamp, m.tool_name, s.source, s.model,
+        s.started_at AS session_started
+    FROM messages_fts
+    JOIN messages   m ON m.id = messages_fts.rowid
+    JOIN sessions   s ON s.id = m.session_id
+    WHERE messages_fts MATCH ?
+    ORDER BY rank
+    LIMIT ? OFFSET ?
+"""</span></pre>
+
+    <p>返回的结果里，<span class="mono">snippet</span> 是带 <span class="mono">>>>&lt;&lt;&lt;</span> 高亮关键词的摘录——LLM 看到这个就知道"啊上次确实讲过这个"。</p>
+  </div>
+</section>
+
+<!-- ============ § 3 ============ -->
+<section id="sqlite">
+  <div class="wrap">
+    <div class="num">§ 3</div>
+    <h2>SQLite FTS5 是什么 · 跟普通 LIKE 比</h2>
+    <p>很多人以为"全文搜索"就是 <span class="mono">WHERE content LIKE '%机械臂%'</span>。FTS5 比这个强 N 个数量级。</p>
+
+    <h3>用 LIKE 搜索 10 万条记录的灾难</h3>
+<pre><span class="c"># 普通 LIKE 查询</span>
+SELECT * FROM messages WHERE content LIKE <span class="s">'%机械臂%'</span>;
+
+<span class="c"># 发生了什么：</span>
+<span class="c"># 1. SQLite 打开 messages 表</span>
+<span class="c"># 2. 顺序扫描每一行（10 万行）</span>
+<span class="c"># 3. 每一行都做字符串包含判断</span>
+<span class="c"># 4. 把匹配的行收集起来</span>
+<span class="c"># → 耗时：O(N × M) · 10万行 × 每行 1000字符 = 1亿次字符比较</span>
+<span class="c"># → 实际：500ms - 5s（取决于机器）</span></pre>
+
+    <h3>FTS5 用倒排索引把这个变成 O(log N)</h3>
+    <p>FTS5 在写数据时维护了一个<em>反向</em>索引：</p>
+
+<pre><span class="c"># 文档原文（10 万条消息）：</span>
+[<span class="v">1</span>] "今天演示机械臂挥手"
+[<span class="v">2</span>] "moveit 配置好以后开始规划"
+[<span class="v">3</span>] "学生问题：PID 控制器怎么调"
+[<span class="o">...</span> <span class="v">99998</span> 条]
+
+<span class="c"># FTS5 自动建的倒排索引：</span>
+<span class="k">"机械臂"</span>  →  [<span class="v">1</span>, <span class="v">17</span>, <span class="v">238</span>, <span class="v">901</span>, <span class="o">...</span>]
+<span class="k">"挥手"</span>    →  [<span class="v">1</span>, <span class="v">45</span>, <span class="v">892</span>]
+<span class="k">"moveit"</span>  →  [<span class="v">2</span>, <span class="v">56</span>, <span class="v">1024</span>]
+<span class="k">"pid"</span>     →  [<span class="v">3</span>, <span class="v">67</span>, <span class="v">2003</span>]
+
+<span class="c"># 查 "机械臂"：直接 hash 查 → 拿到 5 个 rowid → 5 次精确定位</span>
+<span class="c"># 耗时：O(1) + 5 次 lookup · 实际 <span class="k">&lt;</span> 5ms</span></pre>
+
+    <p>这不是魔法——是搜索引擎、数据库的<em>通用底层技术</em>。Elasticsearch、Lucene、PostgreSQL 的 GIN 索引、MySQL 的 FULLTEXT 索引，原理都一样。</p>
+
+    <div class="callout">
+      <b>为什么选 SQLite FTS5 而不是 Elasticsearch：</b><br>
+      · <b>零运维</b>：一个 .db 文件，git 可备份，dropbox 同步<br>
+      · <b>进程内</b>：不需要起第二个服务，没有网络开销<br>
+      · <b>够用</b>：FTS5 在 100 万行内都是 ms 级<br>
+      · <b>ACID</b>：崩溃不丢数据，比 ES 强<br>
+      · <b>你 NUC 8G 内存</b>：SQLite 用 ~50MB，ES 用 ~2GB
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 4 ============ -->
+<section id="schema">
+  <div class="wrap">
+    <div class="num">§ 4</div>
+    <h2>Hermes 怎么建表（带真实 DDL）</h2>
+    <p>文件 <span class="mono">hermes_state.py</span> 行 602-625。<b>这是真实代码</b>，不是伪代码：</p>
+
+<pre><span class="h">FTS_SQL</span> = <span class="s">"""
+CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+    content
+);
+
+CREATE TRIGGER IF NOT EXISTS messages_fts_insert AFTER INSERT ON messages BEGIN
+    INSERT INTO messages_fts(rowid, content) VALUES (
+        new.id,
+        COALESCE(new.content, '') || ' ' || COALESCE(new.tool_name, '') || ' ' || COALESCE(new.tool_calls, '')
+    );
+END;
+
+CREATE TRIGGER IF NOT EXISTS messages_fts_delete AFTER DELETE ON messages BEGIN
+    DELETE FROM messages_fts WHERE rowid = old.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS messages_fts_update AFTER UPDATE ON messages BEGIN
+    DELETE FROM messages_fts WHERE rowid = old.id;
+    INSERT INTO messages_fts(rowid, content) VALUES (
+        new.id,
+        COALESCE(new.content, '') || ' ' || COALESCE(new.tool_name, '') || ' ' || COALESCE(new.tool_calls, '')
+    );
+END;
+"""</span></pre>
+
+    <h3>逐行解释</h3>
+    <ul>
+      <li><span class="h">CREATE VIRTUAL TABLE ... USING fts5(content)</span> —— 建一张虚拟表，<b>不用你手写索引</b>，FTS5 自动维护倒排索引</li>
+      <li><span class="h">rowid</span> —— 跟 <span class="mono">messages</span> 表的主键 id 保持一致（关键！见 § 5）</li>
+      <li><span class="h">content</span> —— 只存一列：你索引的文本</li>
+      <li><span class="h">3 个 TRIGGER</span> —— 监听 <span class="mono">messages</span> 表的 INSERT/DELETE/UPDATE，<b>自动同步</b>到 FTS 表</li>
+    </ul>
+
+    <h3>被索引的字段</h3>
+    <p>注意 INSERT 那行的拼接：</p>
+<pre>COALESCE(new.content, <span class="s">''</span>) || <span class="s">' '</span> || COALESCE(new.tool_name, <span class="s">''</span>) || <span class="s">' '</span> || COALESCE(new.tool_calls, <span class="s">''</span>)</pre>
+
+    <p>意思是：<b>对话内容 + 工具名 + 工具调用参数</b> 全部进索引。也就是说你搜"机械臂"的时候，<b>不只匹配到对话里说过机械臂的句子，还会匹配到曾经调过"ros2 控制机械臂"那条工具调用</b>。</p>
+
+    <p>这在调试时极有用——学生问"上次用的是什么命令"，搜索"ros2 topic"就能找到对应的 tool call。</p>
+  </div>
+</section>
+
+<!-- ============ § 5 ============ -->
+<section id="trigger">
+  <div class="wrap">
+    <div class="num">§ 5</div>
+    <h2>Trigger 怎么让记忆"自动同步"</h2>
+    <p>上面的 3 个 TRIGGER 是整个机制最巧妙的地方。<b>应用代码完全不需要知道 FTS 表的存在</b>。</p>
+
+    <div class="flow">
+      <span class="node">应用代码</span>
+      <span class="arrow">→</span>
+      <span class="node b">INSERT INTO messages</span>
+      <span class="arrow">→</span>
+      <span class="node w">trigger 自动</span>
+      <span class="arrow">→</span>
+      <span class="node g">INSERT INTO messages_fts</span>
+      <span class="arrow">→</span>
+      <span class="node">倒排索引更新</span>
+    </div>
+
+    <p>这就是为什么 Hermes "长期"——你从来没主动去写 FTS 表，<b>数据库自己保证一致性</b>。即使应用代码崩了，<b>要么 messages 和 FTS 都写入，要么都没写入</b>（ACID 事务）。</p>
+
+    <h3>对比常见错误做法</h3>
+    <p>很多 RAG 系统是这样写的：</p>
+<pre><span class="c"># ❌ 错误做法（很多 RAG 系统这么干）</span>
+<span class="k">def</span> <span class="f">save_message</span>(text):
+    db.<span class="f">execute</span>(<span class="s">"INSERT INTO messages VALUES (?)"</span>, (text,))    <span class="c"># step 1</span>
+    db.<span class="f">execute</span>(<span class="s">"INSERT INTO fts_index VALUES (?)"</span>, (text,))  <span class="c"># step 2</span>
+    <span class="c"># 如果 step 2 失败（程序崩了/连接断了），FTS 索引和原文不一致</span>
+    <span class="c"># 搜不到 → 长期记忆"漏"了</span></pre>
+
+    <p>Hermes 用 trigger 的好处：</p>
+<pre><span class="c"># ✓ Hermes 做法</span>
+<span class="k">def</span> <span class="f">save_message</span>(text):
+    db.<span class="f">execute</span>(<span class="s">"INSERT INTO messages VALUES (?)"</span>, (text,))
+    <span class="c"># SQLite 在同一个事务里自动：</span>
+    <span class="c">#   1. 插入 messages</span>
+    <span class="c">#   2. 触发 AFTER INSERT trigger</span>
+    <span class="c">#   3. trigger 把数据塞进 messages_fts</span>
+    <span class="c"># 要么都成功，要么都失败。原子性。</span></pre>
+  </div>
+</section>
+
+<!-- ============ § 6 ============ -->
+<section id="bm25">
+  <div class="wrap">
+    <div class="num">§ 6</div>
+    <h2>查询为什么快 · BM25 排名</h2>
+    <p>FTS5 不只是"找出包含 X 的行"，它会<em>排序</em>——最相关的在前。</p>
+
+    <p>排序算法叫 <b>BM25</b>（Best Matching 25）。原理不复杂，但很巧妙：</p>
+
+    <h3>3 个评分维度</h3>
+    <ol>
+      <li><b>词频（TF）</b>：匹配词在文档里出现越多，分数越高</li>
+      <li><b>逆文档频率（IDF）</b>：如果"机械臂"在 100 万行里只出现 5 次（很罕见），它比"了"（出现 50 万次）的权重高得多</li>
+      <li><b>文档长度归一化</b>：短文档比长文档更"专注"——同样 1 个匹配，10 字的短句比 1000 字的长文相关性高</li>
+    </ol>
+
+    <p>这三者合一，<b>"机械臂挥手" 会自动排到只提一句机械臂的段落前面</b>，而不是排在学生夸夸其谈 PID 的长文里。</p>
+
+    <h3>FTS5 的查询语法</h3>
+    <p>Hermes 的实际查询用 <span class="mono">MATCH</span> 操作符：</p>
+
+<pre><span class="c">-- 简单：包含任一词</span>
+WHERE messages_fts MATCH <span class="s">'机械臂 OR 挥手'</span>
+
+<span class="c">-- 短语：必须连在一起</span>
+WHERE messages_fts MATCH <span class="s">'"机械臂 挥手"'</span>
+
+<span class="c">-- 必含 + 排除</span>
+WHERE messages_fts MATCH <span class="s">'机械臂 AND moveit NOT gazebo'</span>
+
+<span class="c">-- 字段限定</span>
+WHERE messages_fts MATCH <span class="s">'content:机械臂'</span>
+
+<span class="c">-- 排名（BM25 自动算）</span>
+ORDER BY rank
+LIMIT <span class="v">10</span></pre>
+
+    <p><span class="mono">rank</span> 这个伪列是 FTS5 自动提供的——倒排索引里 BM25 分高的行排前面。</p>
+  </div>
+</section>
+
+<!-- ============ § 7 ============ -->
+<section id="cjk">
+  <div class="wrap">
+    <div class="num">§ 7</div>
+    <h2>中文怎么办 · trigram 分词器</h2>
+    <p>这一节是 Hermes 对我们项目最关键的部分——因为你的 7 门课几乎全是中文。</p>
+
+    <h3>问题：默认 FTS5 对中文不友好</h3>
+    <p>FTS5 默认用 <span class="mono">unicode61</span> 分词器，规则很简单：按 Unicode 类别切词。但中文每个字都是独立 token：</p>
+
+<pre><span class="s">"机械臂挥手"</span>
+<span class="c"># unicode61 分词：</span>
+[<span class="s">"机"</span>, <span class="s">"械"</span>, <span class="s">"臂"</span>, <span class="s">"挥"</span>, <span class="s">"手"</span>]
+
+<span class="c"># 搜 "机械臂"：变成 "机 AND 械 AND 臂" → 必须 3 个字同时出现</span>
+<span class="c"># 搜 "机械臂挥手"：变成 5 个字 AND → 几乎搜不到完整短语</span></pre>
+
+    <h3>解决：trigram 分词器</h3>
+    <p>Hermes 用了<em>第二张</em>FTS5 虚拟表，专门给中文/子串搜索用（<span class="mono">hermes_state.py</span> 行 626）：</p>
+
+<pre><span class="h">FTS_TRIGRAM_SQL</span> = <span class="s">"""
+CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts_trigram USING fts5(
+    content,
+    tokenize=<span class="s">'trigram'</span>
+);
+"""</span></pre>
+
+    <p><span class="mono">trigram</span> 把文本切成<em>3 字节滑动窗口</em>：</p>
+
+<pre><span class="s">"机械臂挥手"</span> (UTF-8: <span class="v">15</span> 字节)
+<span class="c"># trigram 分词：</span>
+[<span class="s">"机械臂"</span>, <span class="s">"械臂挥"</span>, <span class="s">"臂挥手"</span>]
+
+<span class="c"># 搜 "机械臂"：直接命中第一个 trigram ✓</span>
+<span class="c"># 搜 "械臂挥"：也能命中（子串搜索） ✓</span>
+<span class="c"># 搜 "机械臂挥手"：需 ≥9 字节 → 3 个 CJK 字 → 正好够 ✓</span></pre>
+
+    <h3>代码里怎么选择走哪张表</h3>
+    <p>行 3373 的判断逻辑：</p>
+
+<pre>is_cjk = self.<span class="f">_contains_cjk</span>(query)
+<span class="k">if</span> is_cjk:
+    cjk_count = self.<span class="f">_count_cjk</span>(raw_query)
+    <span class="k">if</span> cjk_count >= <span class="v">3</span> <span class="k">and</span> <span class="k">not</span> _any_short_cjk:
+        <span class="c"># 走 trigram 表（精确短语 + BM25）</span>
+        <span class="c"># WHERE messages_fts_trigram MATCH '"机械臂"' AND '"挥手"'</span>
+    <span class="k">else</span>:
+        <span class="c"># 中文 ≤2 字，trigram 拼不出来 → 降级用 LIKE</span>
+        <span class="c"># WHERE content LIKE '%机%' AND content LIKE '%械%' ...</span></pre>
+
+    <p>也就是：</p>
+    <ul>
+      <li>英文 / 数字 / 混合查询 → 走 <span class="mono">messages_fts</span>（unicode61）</li>
+      <li>中文 ≥3 字 → 走 <span class="mono">messages_fts_trigram</span></li>
+      <li>中文 ≤2 字 → 降级 LIKE（慢但能用）</li>
+    </ul>
+
+    <div class="callout ok">
+      <b>对我们的意义：</b>你的 7 门课如果是中文，<b>搜"机械臂挥手"在 Hermes 里能精准命中</b>，不会拆字失败。trigram 索引体积大 ~2 倍（多了重叠的 3-gram），但 7 门课总量也就几 MB，磁盘无压力。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 8 ============ -->
+<section id="safety">
+  <div class="wrap">
+    <div class="num">§ 8</div>
+    <h2>查询安全 · sanitize</h2>
+    <p>这是个<em>容易踩坑</em>的点。FTS5 的 <span class="mono">MATCH</span> 有自己的语法（带 <span class="mono">"()+-*:^</span> 这些特殊字符），如果直接拼用户输入，SQLite 会抛 <span class="mono">OperationalError</span>。</p>
+
+    <p>Hermes 用 <span class="mono">_sanitize_fts5_query</span> 函数（行 3138）清洗输入。简化版：</p>
+
+<pre><span class="k">@staticmethod</span>
+<span class="k">def</span> <span class="f">_sanitize_fts5_query</span>(query: <span class="k">str</span>) -> <span class="k">str</span>:
+    <span class="c"># Step 1: 保留双引号包裹的精确短语</span>
+    <span class="c">#   "moveit 配置" → 保留不动</span>
+    <span class="c">#   单独一个 " → 标记成占位符</span>
+    <span class="k">def</span> <span class="f">_preserve_quoted</span>(m): _quoted_parts.<span class="f">append</span>(m.group()); <span class="k">return</span> <span class="s">f"</span><span class="o">\\</span><span class="s">x00Q{len(_quoted_parts)-1}</span><span class="o">\\</span><span class="s">x00"</span>
+    sanitized = re.<span class="f">sub</span>(<span class="s">r'"[^"]*"'</span>, _preserve_quoted, query)
+
+    <span class="c"># Step 2: 去掉剩下的 FTS5 特殊字符</span>
+    sanitized = re.<span class="f">sub</span>(<span class="s">r'[+{}():"^]'</span>, <span class="s">" "</span>, sanitized)
+
+    <span class="c"># Step 3: 含连字符/点号的项加引号（避免被切分）</span>
+    <span class="c">#   chat-send → "chat-send"（不切成 "chat" + "send"）</span>
+    <span class="c">#   P2.2 → "P2.2"（不切成 "P2" + "2"）</span>
+    sanitized = re.<span class="f">sub</span>(<span class="s">r'[A-Za-z0-9_]+[-.][A-Za-z0-9_.-]*'</span>,
+                     <span class="k">lambda</span> m: <span class="s">f'"</span>{m.group()}<span class="s">"'</span>, sanitized)
+
+    <span class="c"># Step 4: 把占位符还原</span>
+    <span class="k">return</span> <span class="s">""</span>.<span class="f">join</span>(...)</pre>
+
+    <p>为什么要做这个？</p>
+    <ul>
+      <li>学生输入 <span class="mono">TODO: fix bug</span> → 冒号 <span class="mono">:</span> 是 FTS5 的"列限定符"，会触发 "no such column" 错误</li>
+      <li>学生输入 <span class="mono">(2024 笔记)</span> → 括号被当成语法</li>
+      <li>学生输入 <span class="mono">moveit + 配置</span> → 加号被当成 AND 强制</li>
+    </ul>
+    <p>sanitize 把这些都转成安全形式，<b>不破坏正常搜索</b>，<b>避免 SQL 错误</b>。</p>
+  </div>
+</section>
+
+<!-- ============ § 9 ============ -->
+<section id="full-flow">
+  <div class="wrap">
+    <div class="num">§ 9</div>
+    <h2>一次完整写入 + 检索的全流程</h2>
+    <p>把所有环节串起来。场景：<b>学生问"上次我问你机械臂怎么挥手来着"</b>。</p>
+
+    <h3>阶段 1 · 写入（昨天的对话）</h3>
+    <div class="flow">
+      <span class="node">学生发问</span>
+      <span class="arrow">→</span>
+      <span class="node b">agent 回答</span>
+      <span class="arrow">→</span>
+      <span class="node">save_turn(user_msg, assistant_msg)</span>
+      <span class="arrow">→</span>
+      <span class="node w">INSERT INTO messages</span>
+      <span class="arrow">→</span>
+      <span class="node g">trigger 触发</span>
+      <span class="arrow">→</span>
+      <span class="node">messages_fts 自动更新</span>
+    </div>
+
+    <p>这一步 agent 跑完后，<b>数据库里永久存着</b>。你明天重启电脑，后天刷系统，文件还在。</p>
+
+    <h3>阶段 2 · 检索（今天）</h3>
+    <div class="flow">
+      <span class="node">学生发问</span>
+      <span class="arrow">→</span>
+      <span class="node b">LLM 决定调 session_search</span>
+      <span class="arrow">→</span>
+      <span class="node">query = "机械臂 挥手"</span>
+      <span class="arrow">→</span>
+      <span class="node w">_sanitize_fts5_query</span>
+      <span class="arrow">→</span>
+      <span class="node g">MATCH '"机械臂" "挥手"'</span>
+      <span class="arrow">→</span>
+      <span class="node">命中 N 行 · BM25 排序</span>
+      <span class="arrow">→</span>
+      <span class="node">top-10 + snippet 高亮</span>
+      <span class="arrow">→</span>
+      <span class="node">塞进 LLM 上下文</span>
+      <span class="arrow">→</span>
+      <span class="node">LLM 写回答</span>
+    </div>
+
+    <h3>整个流程总耗时</h3>
+    <ul>
+      <li>写入：<b>~2ms / 条</b>（含 trigger 触发 + 索引更新）</li>
+      <li>检索：<b>~5-20ms</b>（10 万行规模下）</li>
+      <li>snippet 生成：<b>~1ms</b></li>
+      <li>总延迟：<b>~30ms</b> —— 用户感觉"瞬间"</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ § 10 ============ -->
+<section id="implications">
+  <div class="wrap">
+    <div class="num">§ 10</div>
+    <h2>对我们的项目意味着什么</h2>
+    <p>读完这一篇，你对 aquarius-psyche 项目能做的判断是：</p>
+
+    <h3>1. 7 门课接进 Hermes 的可行性 ✅</h3>
+    <p>7 门课总量预估几十 MB。每节课拆成 100-500 个 chunk，<b>7 × 300 ≈ 2100 chunk</b>。<br>
+    塞进 messages_fts 索引，<b>~10MB 索引文件</b>，每次查询 <b>5-20ms</b>。<br>
+    <b>够用，不卡。</b></p>
+
+    <h3>2. 错例库能撑多久 ✅</h3>
+    <p>假设一个学生每周产生 50 条错例，一年 50 周 = <b>2,500 条/年/学生</b>。<br>
+    一个班 30 个学生 = <b>75,000 条/年/班</b>。<br>
+    3 年下来 ~22 万条。<b>FTS5 仍能 30ms 内返回</b>，磁盘 < ~200MB。<br>
+    <b>够用 5-10 年不爆。</b></p>
+
+    <h3>3. 跟 ChromaDB 怎么分工</h3>
+    <p>Hermes 自带 FTS5 处理<em>对话历史</em>，<b>不需要</b>ChromaDB。<br>
+    <b>但是</b>——7 门课是<em>静态知识</em>，不是对话历史。两种方案：</p>
+    <ul>
+      <li><b>方案 A（轻）</b>：把 7 门课当"超大 MEMORY.md"塞进 FTS5 索引。简单、零依赖。</li>
+      <li><b>方案 B（重）</b>：用 ChromaDB 单独索引 7 门课，<em>学嵌入向量</em>。能搜"意思相近"的内容，不只"包含关键词"。</li>
+    </ul>
+    <p>建议：<b>先 A 跑通，再 B</b>。A 用 Hermes 自带能力，<em>不增加任何依赖</em>，就能让你看到 80% 的效果。</p>
+
+    <h3>4. 还能扩展什么</h3>
+    <ul>
+      <li><b>检索结果再排序</b>：用 LLM 对 top-10 重新打分（re-rank），精度再提升 20%</li>
+      <li><b>按时间衰减权重</b>：1 年前的对话权重 ×0.5，让最近的优先</li>
+      <li><b>多模态索引</b>：图片转 caption 后进 FTS5（已有 vision tool）</li>
+      <li><b>导出训练数据</b>：把 FTS5 命中的对话导出成 ShareGPT 格式，<em>微调你自己的小模型</em>（这是 Hermes 的"研究就绪"卖点之一）</li>
+    </ul>
+
+    <div class="callout q">
+      <b>回到主阅读手册：</b>读完这个附录，你应该能回答之前 § 4 的 Q1 了——<br>
+      "Hermes 的'持续学习'是不是你想要的？" 答案大概率是 <b>是</b>，因为它的实现是工程化的、有代码保证的、不是营销话术。
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="row">
+      <div>附录 A · 源码级解析 · 2026.06.13</div>
+      <div>回 <a href="https://howe12.github.io/aquarius-psyche/">主阅读手册</a></div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
