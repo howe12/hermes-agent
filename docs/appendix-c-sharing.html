@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hermes 多实例共享 · 4 种机制全解 · aquarius-psyche</title>
+<meta name="description" content="4 种 Hermes 实例间共享数据的方式：profile / backup+import / honcho 共享 backend / 共享 HERMES_HOME 目录。源码级解析 + 适用场景。">
+<style>
+:root {
+  --ink: #0f172a;
+  --ink-2: #334155;
+  --ink-3: #64748b;
+  --ink-4: #94a3b8;
+  --paper: #fafaf7;
+  --paper-2: #f1f1ec;
+  --paper-3: #e7e6df;
+  --line: #d6d4c8;
+  --line-2: #b8b6a8;
+  --accent: #1e6091;
+  --accent-2: #154c75;
+  --accent-soft: #dbe9f3;
+  --warm: #a04a1d;
+  --warm-soft: #f6e7d8;
+  --ok: #1f6b3c;
+  --ok-soft: #dcecdf;
+  --q: #8e2a3b;
+  --q-soft: #f3dde0;
+  --purple: #5b21b6;
+  --purple-soft: #ede9fe;
+  --code-bg: #1a2233;
+  --code-fg: #e5edf7;
+  --code-key: #93c5fd;
+  --code-str: #fcd34d;
+  --code-fn: #c4b5fd;
+  --code-com: #64748b;
+  --code-num: #fda4af;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --serif: "Iowan Old Style", "Source Han Serif SC", "Songti SC", "STSong", serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: var(--sans); color: var(--ink); background: var(--paper); font-size: 16px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-soft); color: var(--accent-2); }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .15s; }
+a:hover { border-bottom-color: var(--accent); }
+code, kbd, .mono { font-family: var(--mono); font-size: .92em; }
+:not(pre) > code { padding: 1px 6px; background: var(--paper-2); border-radius: 3px; font-size: 14px; color: var(--accent-2); }
+.wrap { max-width: 920px; margin: 0 auto; padding: 0 28px; }
+section { padding: 72px 0; border-top: 1px solid var(--line); }
+section:first-of-type { border-top: none; }
+section h2 { font-family: var(--serif); font-size: 32px; font-weight: 500; letter-spacing: -.01em; margin: 0 0 8px; color: var(--ink); }
+section .lede { font-size: 16px; color: var(--ink-2); margin: 0 0 36px; max-width: 720px; }
+section .num { display: inline-block; font-family: var(--mono); font-size: 12px; color: var(--ink-3); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 14px; }
+section h3 { font-family: var(--serif); font-size: 22px; font-weight: 500; color: var(--ink); margin: 36px 0 12px; }
+section h4 { font-size: 16px; font-weight: 600; color: var(--ink); margin: 24px 0 10px; }
+section p { margin: 0 0 16px; }
+section ul, section ol { margin: 0 0 16px; padding-left: 22px; }
+section li { margin-bottom: 6px; }
+
+.toc { background: var(--paper-2); border: 1px solid var(--line); border-radius: 8px; padding: 20px 24px; margin: 32px 0 0; }
+.toc h4 { font-size: 12px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--ink-3); margin: 0 0 12px; font-weight: 500; }
+.toc ol { margin: 0; padding-left: 20px; }
+.toc li { font-size: 14px; color: var(--ink-2); margin-bottom: 4px; }
+.toc li::marker { color: var(--ink-3); font-family: var(--mono); }
+.toc a { color: var(--ink-2); }
+.toc a:hover { color: var(--accent); }
+
+.hero { padding: 80px 0 40px; }
+.hero .label { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--ink-3); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 24px; }
+.hero .label .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--purple); box-shadow: 0 0 0 3px var(--purple-soft); animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+.hero h1 { font-family: var(--serif); font-size: 48px; font-weight: 500; line-height: 1.1; letter-spacing: -.02em; margin: 0 0 18px; color: var(--ink); }
+.hero .tag { font-size: 18px; color: var(--ink-2); max-width: 720px; margin: 0 0 8px; }
+.hero .sub { font-size: 15px; color: var(--ink-3); max-width: 720px; margin: 0 0 28px; }
+
+pre { background: var(--code-bg); color: var(--code-fg); padding: 20px 22px; border-radius: 8px; overflow-x: auto; font-family: var(--mono); font-size: 13.5px; line-height: 1.65; margin: 16px 0 20px; border: 1px solid #2a3450; }
+pre .k { color: var(--code-key); }
+pre .s { color: var(--code-str); }
+pre .f { color: var(--code-fn); }
+pre .c { color: var(--code-com); font-style: italic; }
+pre .v { color: var(--code-num); }
+pre .o { color: #94a3b8; }
+pre .h { color: #c4b5fd; font-weight: 600; }
+
+.t { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 14px; }
+.t th, .t td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+.t th { font-weight: 600; color: var(--ink); background: var(--paper-2); font-size: 13px; }
+.t td { color: var(--ink-2); vertical-align: top; }
+.t tr:last-child td { border-bottom: 2px solid var(--line-2); }
+.t .yn { font-family: var(--mono); font-size: 12px; padding: 2px 6px; border-radius: 3px; }
+.t .yn.y { background: var(--ok-soft); color: var(--ok); }
+.t .yn.p { background: var(--paper-3); color: var(--ink-3); }
+.t .yn.n { background: var(--q-soft); color: var(--q); }
+
+.callout { background: var(--paper-2); border: 1px solid var(--line); border-radius: 8px; padding: 18px 22px; margin: 16px 0 20px; font-size: 14.5px; }
+.callout.warn { background: var(--warm-soft); border-color: var(--warm); }
+.callout.ok { background: var(--ok-soft); border-color: var(--ok); }
+.callout.q { background: var(--accent-soft); border-color: var(--accent); }
+.callout.purple { background: var(--purple-soft); border-color: var(--purple); }
+.callout b { color: var(--ink); }
+.callout.warn b { color: var(--warm); }
+.callout.ok b { color: var(--ok); }
+.callout.q b { color: var(--accent-2); }
+.callout.purple b { color: var(--purple); }
+
+.methods { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+.methods .m { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
+.methods .m.l1 { background: var(--ok-soft); border-color: var(--ok); }
+.methods .m.l2 { background: var(--warm-soft); border-color: var(--warm); }
+.methods .m.l3 { background: var(--purple-soft); border-color: var(--purple); }
+.methods .m.l4 { background: var(--accent-soft); border-color: var(--accent); }
+.methods .m .n { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 6px; }
+.methods .m.l1 .n { color: var(--ok); }
+.methods .m.l2 .n { color: var(--warm); }
+.methods .m.l3 .n { color: var(--purple); }
+.methods .m.l4 .n { color: var(--accent-2); }
+.methods .m .t { font-family: var(--serif); font-size: 18px; color: var(--ink); margin-bottom: 8px; }
+.methods .m .d { font-size: 13px; color: var(--ink-2); }
+.methods .m .use { margin-top: 12px; font-size: 12.5px; color: var(--ink-2); padding-top: 10px; border-top: 1px dashed var(--line-2); }
+
+.flow { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 20px 0 24px; padding: 18px; background: var(--paper-2); border-radius: 8px; border: 1px solid var(--line); }
+.flow .node { background: var(--paper); border: 1px solid var(--line-2); border-radius: 6px; padding: 8px 14px; font-size: 13px; color: var(--ink); font-family: var(--mono); }
+.flow .node.b { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-2); }
+.flow .node.w { background: var(--warm-soft); border-color: var(--warm); color: var(--warm); }
+.flow .node.g { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.flow .node.p { background: var(--purple-soft); border-color: var(--purple); color: var(--purple); }
+.flow .arrow { color: var(--ink-3); font-family: var(--mono); }
+
+footer { padding: 36px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); }
+footer .row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+
+@media (max-width: 800px) {
+  .hero h1 { font-size: 32px; }
+  .methods { grid-template-columns: 1fr; }
+  section h2 { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .hero .label .dot { animation: none; } }
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="wrap">
+    <div class="label"><span class="dot"></span>aquarius-psyche · 附录 C · 源码级解析</div>
+    <h1>Hermes 多实例共享 · 4 种机制</h1>
+    <p class="tag">"其他 Hermes 也有相关记忆，怎么共享？"——这是不同部署之间的同步问题。Hermes 设计了 4 种机制，覆盖从本地多 profile 到云端共享后端的所有场景。</p>
+    <p class="sub">附在主阅读手册之后。约 12 分钟。</p>
+
+    <div class="toc">
+      <h4>目录</h4>
+      <ol>
+        <li><a href="#problem">问题定义 · "共享"指什么</a></li>
+        <li><a href="#matrix">4 种机制对照矩阵</a></li>
+        <li><a href="#l1">L1 · 共享 HERMES_HOME 目录（最朴素）</a></li>
+        <li><a href="#l2">L2 · hermes profile（同一台机器多实例）</a></li>
+        <li><a href="#l3">L3 · hermes backup + import（zip 整包搬家）</a></li>
+        <li><a href="#l4">L4 · 共享 honcho 后端（云端实时同步）</a></li>
+        <li><a href="#which">怎么选 · 决策流程</a></li>
+        <li><a href="#implications">对机器人 + 教育场景的实操</a></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 1 ============ -->
+<section id="problem">
+  <div class="wrap">
+    <div class="num">§ 1</div>
+    <h2>问题定义 · "共享"指什么</h2>
+    <p>你问的"共享"是个有歧义的词。Hermes 的设计里至少有 4 种"共享"，目的和实现完全不同：</p>
+
+    <ul>
+      <li><b>同一台机器，两个 hermes 安装</b>——比如你想 NUC 和 Spark 机器人各装一个，但想共享 skill 库。</li>
+      <li><b>同一台机器，多个 hermes 实例</b>——比如一个装来写代码，一个装来控制机器人，要互相隔离。</li>
+      <li><b>不同机器，搬家</b>——比如在 NUC 上跑了 1 周，要把全部状态搬到你的笔记本。</li>
+      <li><b>不同机器，实时共享</b>——比如 NUC 的 hermes 和你的笔记本的 hermes 看到的学生画像是同步的。</li>
+    </ul>
+
+    <p>每种共享对应 <b>不同的代码机制</b>。混淆就会出错——比如你不会用"zip 搬家"去做"实时同步"（性能/一致性都不行），也不会用"实时共享"去做"完全隔离"（隐私不行）。</p>
+
+    <div class="callout q">
+      <b>先说一个全局原则：</b>Hermes <em>没有任何机制</em>支持"多 hermes 同时写同一个数据"——那会破坏 SQLite 的 ACID 假设。所以下面所有"共享"方案，<b>要么是单向读</b>（备份还原、profile 克隆），<b>要么是后端代为同步</b>（honcho）。这个原则决定了 4 种机制各自的适用场景。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 2 ============ -->
+<section id="matrix">
+  <div class="wrap">
+    <div class="num">§ 2</div>
+    <h2>4 种机制对照矩阵</h2>
+
+    <div class="methods">
+      <div class="m l1">
+        <div class="n">L1 · 文件系统层</div>
+        <div class="t">共享 HERMES_HOME</div>
+        <div class="d">两个 hermes 进程读同一个 <span class="mono">~/.hermes/</span> 目录。用 NFS / SMB / iCloud / Dropbox / 软链。</div>
+        <div class="use">适合：单机多用户、NUC + 笔记本同账号、文件级协作</div>
+      </div>
+      <div class="m l2">
+        <div class="n">L2 · 同一机器多实例</div>
+        <div class="t">hermes profile</div>
+        <div class="d"><span class="mono">hermes profile create/use</span> 在同一安装下切换多个隔离实例。源 = <span class="mono">hermes_cli/subcommands/profile.py</span>。</div>
+        <div class="use">适合：同一台机器、多个不同任务场景、配置完全隔离</div>
+      </div>
+      <div class="m l3">
+        <div class="n">L3 · 跨机器搬家</div>
+        <div class="t">hermes backup + import</div>
+        <div class="d"><span class="mono">hermes backup</span> 打包整个 <span class="mono">~/.hermes/</span> 为 zip，<span class="mono">hermes import</span> 还原。源 = <span class="mono">hermes_cli/backup.py</span>（1064 行）。</div>
+        <div class="use">适合：换机器、迁移、灾备、定时快照</div>
+      </div>
+      <div class="m l4">
+        <div class="n">L4 · 跨设备实时共享</div>
+        <div class="t">共享 honcho 后端</div>
+        <div class="d">切换 memory provider 到 honcho，多 hermes 实例通过同一 workspace 共享 user model。源 = <span class="mono">plugins/memory/honcho/</span>。</div>
+        <div class="use">适合：多端协同（手机+笔记本+NUC）、跨设备学情画像</div>
+      </div>
+    </div>
+
+    <table class="t">
+      <tr>
+        <th></th>
+        <th>L1 共享目录</th>
+        <th>L2 profile</th>
+        <th>L3 backup+import</th>
+        <th>L4 honcho</th>
+      </tr>
+      <tr>
+        <td>跨机器？</td>
+        <td><span class="yn y">✓</span>（NFS/SMB）</td>
+        <td><span class="yn n">✗</span> 本机</td>
+        <td><span class="yn y">✓</span>（zip 拷）</td>
+        <td><span class="yn y">✓</span></td>
+      </tr>
+      <tr>
+        <td>实时同步？</td>
+        <td>几乎实时（看文件 sync 延迟）</td>
+        <td>N/A</td>
+        <td>手动（每次 backup/import）</td>
+        <td><span class="yn y">✓ 实时</span></td>
+      </tr>
+      <tr>
+        <td>支持写冲突？</td>
+        <td><span class="yn n">✗</span>（SQLite 强一致性假设）</td>
+        <td>N/A</td>
+        <td>N/A（一次性）</td>
+        <td><span class="yn y">✓ honcho 协调</span></td>
+      </tr>
+      <tr>
+        <td>需要网络/服务？</td>
+        <td>本地网络</td>
+        <td>无</td>
+        <td>无</td>
+        <td><span class="yn y">需要 honcho-ai 服务</span></td>
+      </tr>
+      <tr>
+        <td>隔离度</td>
+        <td>完全共享</td>
+        <td>完全隔离</td>
+        <td>完全独立</td>
+        <td>共享 user model，独立 session</td>
+      </tr>
+      <tr>
+        <td>配置难度</td>
+        <td>低</td>
+        <td>低</td>
+        <td>极低</td>
+        <td>中（要注册 honcho-ai）</td>
+      </tr>
+    </table>
+
+    <div class="callout purple">
+      <b>一句话：</b>前 3 个都是<em>本地 + 文件</em>的方案，第 4 个才是<em>真正的分布式 + 实时</em>。根据你的问题形态选一个，<em>不是 4 个都上</em>。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 3 ============ -->
+<section id="l1">
+  <div class="wrap">
+    <div class="num">§ 3</div>
+    <h2>L1 · 共享 HERMES_HOME 目录（最朴素）</h2>
+    <p>所有 hermes 数据都在 <span class="mono">~/.hermes/</span>（或 <span class="mono">$HERMES_HOME</span>）。<b>最直接的"共享"就是让两个 hermes 读同一个目录</b>。</p>
+
+    <h3>实现方式</h3>
+    <ul>
+      <li><b>符号链接</b>：在第二台机器 <span class="mono">ln -s /mnt/shared/leo/.hermes ~/.hermes</span></li>
+      <li><b>NFS / SMB 挂载</b>：把 NUC 的 <span class="mono">~/.hermes/</span> 挂到笔记本</li>
+      <li><b>Dropbox / iCloud / Syncthing</b>：直接把目录放云同步盘里（⚠️ 见下面警告）</li>
+    </ul>
+
+    <h3>机制</h3>
+    <p>Hermes 的所有数据访问都走 <span class="mono">hermes_constants.get_hermes_home()</span>：</p>
+<pre><span class="c"># hermes_constants.py 真实代码（行 53-65）</span>
+<span class="k">def</span> <span class="f">get_hermes_home</span>() -> <span class="k">Path</span>:
+    <span class="c"># 1. 读 HERMES_HOME 环境变量</span>
+    <span class="c"># 2. 否则读 active_profile 配置文件</span>
+    <span class="c"># 3. 否则用平台默认 (~/.hermes/)</span>
+    <span class="k">return</span> <span class="f">Path</span>(os.environ.get(<span class="s">"HERMES_HOME"</span>) <span class="k">or</span> _default_path())</pre>
+
+    <p>所以你可以：</p>
+<pre><span class="c"># 在第二台机器（笔记本）</span>
+<span class="k">export</span> HERMES_HOME=/mnt/nuc-leo/.hermes
+hermes chat</pre>
+
+    <h3>适用场景</h3>
+    <ul>
+      <li>同账号在 NUC + 笔记本 + 手机上跑 hermes</li>
+      <li>家庭/小团队多设备同步（家里一台 NUC 常开）</li>
+      <li>不需要"实时"——下班前 NUC 跑完，明天打开笔记本看到</li>
+    </ul>
+
+    <div class="callout warn">
+      <b>⚠️ SQLite + 文件同步盘的硬伤：</b>Hermes 用的 SQLite 假设<em>同一台机器单进程写</em>。如果你同时在两台机器跑 hermes，<b>SQLite 必崩</b>。所以 L1 真正安全的使用方式是：<b>同一时间只在一台机器上跑 hermes</b>，另一台只是"读 + 偶尔重启接管"。如果你需要"两台同时跑"——必须升级到 L4 honcho。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 4 ============ -->
+<section id="l2">
+  <div class="wrap">
+    <div class="num">§ 4</div>
+    <h2>L2 · hermes profile（同一台机器多实例）</h2>
+    <p>文件 <span class="mono">hermes_cli/subcommands/profile.py</span>（203 行）。</p>
+
+    <h3>是什么</h3>
+    <p><span class="mono">hermes profile</span> 在<em>同一台机器同一份 hermes 安装</em>下，<b>开多个隔离的实例</b>。每个实例有自己的 <span class="mono">~/.hermes/profiles/&lt;name&gt;/</span> 目录。</p>
+
+    <h3>关键命令</h3>
+<pre><span class="c"># 真实 subcommand（profile.py 里的 build_profile_parser）</span>
+hermes profile list                              <span class="c"># 列出所有 profile</span>
+hermes profile use &lt;name&gt;                        <span class="c"># 切到某 profile（sticky）</span>
+hermes profile create &lt;name&gt; [--clone] [--clone-all] [--clone-from SRC]
+                                                 <span class="c"># 新建（可选从已有克隆）</span>
+hermes profile delete &lt;name&gt; -y                  <span class="c"># 删除</span>
+hermes profile describe &lt;name&gt; [--auto]         <span class="c"># 设置/读描述（给 kanban 用）</span></pre>
+
+    <h3>2 种克隆模式</h3>
+    <ul>
+      <li><span class="mono">--clone</span>：复制 config / .env / SOUL.md / skills（<em>启动用</em>的）</li>
+      <li><span class="mono">--clone-all</span>：全量复制（<em>包括所有 state</em>）</li>
+    </ul>
+
+    <h3>适合什么场景</h3>
+    <div class="flow">
+      <span class="node g">profile: code</span>
+      <span class="arrow">·</span>
+      <span class="node w">profile: robot</span>
+      <span class="arrow">·</span>
+      <span class="node p">profile: tutor</span>
+    </div>
+    <ul>
+      <li><b>profile: code</b> —— 用 Claude Sonnet 写代码，关闭机器人 skill</li>
+      <li><b>profile: robot</b> —— 用 DeepSeek 跑机械臂，全开机器人 skill</li>
+      <li><b>profile: tutor</b> —— 教育场景，对接学生学情</li>
+    </ul>
+
+    <p>这三个 profile <em>互不干扰</em>——你切换 profile 时 LLM 配置、skill 集合、memory 都跟着切。</p>
+
+    <div class="callout q">
+      <b>关键设计点：</b>profile 不是为了"共享"，是为了"<b>隔离</b>"。如果你想"同一台机器装两个 hermes"——profile 就是官方答案。<em>不要</em>手动建两个 <span class="mono">~/.hermes/</span> 目录，profile 系统已经管了。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 5 ============ -->
+<section id="l3">
+  <div class="wrap">
+    <div class="num">§ 5</div>
+    <h2>L3 · hermes backup + import（zip 整包搬家）</h2>
+    <p>文件 <span class="mono">hermes_cli/backup.py</span>（1064 行）。</p>
+
+    <h3>两条命令</h3>
+<pre><span class="c"># 1. 备份（hermes_cli/main.py:4231）</span>
+hermes backup                              <span class="c"># 整包打 zip → ~/hermes-backup-20260613.zip</span>
+hermes backup -o /tmp/snap.zip             <span class="c"># 指定输出</span>
+hermes backup --quick                      <span class="c"># 只备份关键状态（快）</span>
+hermes backup --quick -l daily             <span class="c"># + label</span>
+
+<span class="c"># 2. 还原（main.py:4243）</span>
+hermes import /tmp/snap.zip                <span class="c"># 还原</span>
+hermes import /tmp/snap.zip -f             <span class="c"># 覆盖不提示</span></pre>
+
+    <h3>backup 包含什么</h3>
+    <p>从 <span class="mono">_EXCLUDED_DIRS</span>、<span class="mono">_EXCLUDED_SUFFIXES</span>、<span class="mono">_EXCLUDED_NAMES</span> 看：</p>
+
+<pre><span class="c"># hermes_cli/backup.py:28-66 真实代码</span>
+_EXCLUDED_DIRS = {
+    <span class="s">"hermes-agent"</span>,    <span class="c"># 仓库本身（重新 clone）</span>
+    <span class="s">"__pycache__"</span>,     <span class="c"># 字节码缓存</span>
+    <span class="s">".git"</span>,            <span class="c"># git 目录</span>
+    <span class="s">"node_modules"</span>,    <span class="c"># js 依赖</span>
+    <span class="s">"backups"</span>,         <span class="c"># 嵌套备份（防指数爆炸）</span>
+    <span class="s">"checkpoints"</span>,     <span class="c"># 会话本地轨迹缓存（不可移植）</span>
+}
+
+_EXCLUDED_SUFFIXES = (
+    <span class="s">".pyc"</span>, <span class="s">".pyo"</span>,
+    <span class="c"># SQLite sidecar：WAL/SHM/journal 跳过，</span>
+    <span class="c"># 避免快照+旧 sidecar 拼出撕裂状态</span>
+    <span class="s">".db-wal"</span>, <span class="s">".db-shm"</span>, <span class="s">".db-journal"</span>,
+)
+
+_EXCLUDED_NAMES = {
+    <span class="s">"gateway.pid"</span>,   <span class="c"># 运行时 pid（换机器无意义）</span>
+    <span class="s">"cron.pid"</span>,
+}</pre>
+
+    <p>所以 backup 实际打包的是：<b>所有 state + 全部 skill + cron 配置 + auth + config.yaml + .env + sessions.db</b>。</p>
+
+    <h3>--quick 模式</h3>
+    <p>只备份<em>关键状态文件</em>，适合每天自动备份：</p>
+    <ul>
+      <li><span class="mono">config.yaml</span></li>
+      <li><span class="mono">state.db</span>（这是最关键的，所有 session + FTS5 索引）</li>
+      <li><span class="mono">.env</span>（API keys）</li>
+      <li><span class="mono">auth.json</span>（OAuth 凭证）</li>
+      <li><span class="mono">cron/</span></li>
+    </ul>
+    <p>不含 skills、不含 detailed sessions。恢复时 hermes 重新下载 skills 就行。</p>
+
+    <h3>适用场景</h3>
+    <div class="flow">
+      <span class="node">NUC</span>
+      <span class="arrow">→ zip →</span>
+      <span class="node w">scp</span>
+      <span class="arrow">→ 笔记本</span>
+      <span class="arrow">→ hermes import</span>
+      <span class="node g">新机器满血</span>
+    </div>
+    <ul>
+      <li>换机器（笔记本换台式机）</li>
+      <li>团队/家庭内部传递（"这是我配好的 hermes"）</li>
+      <li>灾备（每天 cron 跑 hermes backup --quick）</li>
+      <li>实验 / 试错（备份 → 改坏 → import 还原）</li>
+    </ul>
+
+    <div class="callout ok">
+      <b>SQLite 一致性保护：</b>备份时 Hermes 调 <span class="mono">sqlite3.backup()</span>（行 ~140）做<em>原子快照</em>，不是粗暴 cp。这就是为什么 <span class="mono">.db-wal/.db-shm/.db-journal</span> 都被排除——它们是 SQLite 运行时 sidecar，跟 atomic snapshot 配对会出"撕裂状态"。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 6 ============ -->
+<section id="l4">
+  <div class="wrap">
+    <div class="num">§ 6</div>
+    <h2>L4 · 共享 honcho 后端（云端实时同步）</h2>
+    <p>文件 <span class="mono">plugins/memory/honcho/</span>。这是<em>唯一</em>真正"实时多端共享"的方案。</p>
+
+    <h3>honcho 是什么</h3>
+    <p>Honcho 是 <b>AI-native memory 库</b>，专门为多端场景设计。从 <span class="mono">plugins/memory/honcho/plugin.yaml</span>：</p>
+    <pre><span class="s">description: "Honcho AI-native memory — cross-session user modeling
+  with dialectic Q&amp;A, semantic search, and persistent conclusions."</span></pre>
+
+    <p>关键短语：<b>cross-session user modeling</b>。它不只存"对话内容"，而是建立<em>用户模型</em>——"leo 在机械臂上踩过坑"、"leo 偏好简洁回答"。</p>
+
+    <h3>它怎么"共享"</h3>
+    <p>从 <span class="mono">plugins/memory/honcho/client.py</span> 头部的解析顺序：</p>
+<pre><span class="c"># honcho client 配置解析顺序</span>
+<span class="v">1.</span> $HERMES_HOME/honcho.json          <span class="c"># 实例级（隔离用）</span>
+<span class="v">2.</span> ~/.honcho/config.json            <span class="c"># 全局（跨 hermes 共享）</span>
+<span class="v">3.</span> 环境变量 HONCHO_API_KEY 等       <span class="c"># 临时</span></pre>
+
+    <p>关键在 <b>第 2 个</b>——<span class="mono">~/.honcho/config.json</span> 是<em>用户级</em>配置，<b>所有 hermes 实例共享</b>。你装在 NUC 和笔记本的两个 hermes，只要都用 <span class="mono">~/.honcho/config.json</span> 里的同一组 credentials，<b>就自动共享 honcho workspace</b>。</p>
+
+    <h3>共享的是什么</h3>
+    <p>Honcho 内部是 <em>workspace</em>（= 一个共享知识库）+ <em>peer</em>（= 一个用户/AI 角色）：</p>
+    <ul>
+      <li><b>peer card</b>：关于某个用户的"持久结论卡"——"leo 的机器人项目在 ROS2 Humble"</li>
+      <li><b>semantic search</b>：跨设备的对话历史语义检索（"上次他提过 PID 调参"）</li>
+      <li><b>dialectic 模式</b>：两台设备上的 hermes 都能"读 + 写"同一张 peer card，Honcho 后端协调</li>
+    </ul>
+
+    <h3>机制示意</h3>
+    <div class="flow">
+      <span class="node">NUC hermes</span>
+      <span class="arrow">→</span>
+      <span class="node p">Honcho 云</span>
+      <span class="arrow">←</span>
+      <span class="node">笔记本 hermes</span>
+    </div>
+    <p>两台 hermes 都通过 honcho-ai SDK 跟<em>同一个 workspace</em>对话。Honcho 后端处理冲突、合并 user model、保持一致。</p>
+
+    <h3>profile 隔离 vs honcho 共享</h3>
+    <p>从 <span class="mono">client.py</span> 还能看到一个精细设计：</p>
+    <pre><span class="c"># client.py: profile_host_key()</span>
+<span class="k">def</span> <span class="f">profile_host_key</span>(profile):
+    <span class="k">if not</span> profile <span class="k">or</span> profile <span class="k">in</span> {<span class="s">"default"</span>, <span class="s">"custom"</span>}:
+        <span class="k">return</span> <span class="s">"hermes"</span>           <span class="c"># 默认 profile → host="hermes"</span>
+    <span class="k">return</span> <span class="s">f"hermes_{profile}"</span>  <span class="c"># 其他 profile → host="hermes_xxx"</span></pre>
+
+    <p>这意味着 <b>profile 和 honcho 共享可以<em>同时</em>用</b>：</p>
+    <ul>
+      <li>不同 profile <b>独立</b>（peer card 互不可见）</li>
+      <li>同一 profile 的多台 hermes <b>共享</b>（peer card 同步）</li>
+    </ul>
+
+    <h3>需要什么</h3>
+    <ul>
+      <li>注册 <a href="https://honcho.ai">honcho.ai</a> 账号</li>
+      <li>把 <span class="mono">HONCHO_API_KEY</span> 写到 <span class="mono">~/.honcho/config.json</span> 或 <span class="mono">~/.hermes/.env</span></li>
+      <li>Hermes config 加 <span class="mono">memory.provider: honcho</span></li>
+    </ul>
+
+    <div class="callout purple">
+      <b>对机器人 + 教育场景的意义：</b>这是<em>唯一一个</em>让"NUC 的 hermes 看见学生在笔记本上问的问题"的方案。错例库 / 学情档案 / 用户偏好，<b>所有设备自动一致</b>，学生/老师在哪台设备提问都看到一样的"leo 的学习历史"。
+    </div>
+  </div>
+</section>
+
+<!-- ============ § 7 ============ -->
+<section id="which">
+  <div class="wrap">
+    <div class="num">§ 7</div>
+    <h2>怎么选 · 决策流程</h2>
+    <p>用决策树回答你的"什么方式共享"问题：</p>
+
+    <h3>1. 你要"跨设备"还是"同设备"？</h3>
+    <ul>
+      <li><b>同设备多场景</b> → L2 profile</li>
+      <li><b>跨设备</b> → 继续问</li>
+    </ul>
+
+    <h3>2. 跨设备要"实时"还是"手动"？</h3>
+    <ul>
+      <li><b>实时同步</b> → L4 honcho（要云服务）</li>
+      <li><b>手动 / 定时</b> → 继续问</li>
+    </ul>
+
+    <h3>3. 跨设备"手动"场景：是迁移还是共用？</h3>
+    <ul>
+      <li><b>迁移 / 灾备</b> → L3 backup+import</li>
+      <li><b>共用同一份数据</b> → L1 共享 HERMES_HOME（但不能同时跑）</li>
+    </ul>
+
+    <h3>决策矩阵速查</h3>
+    <table class="t">
+      <tr>
+        <th>你的场景</th>
+        <th>推荐</th>
+      </tr>
+      <tr><td>NUC 常开 + 笔记本偶尔用 + 不同时跑</td><td><b>L1</b> 共享目录</td></tr>
+      <tr><td>同一台机器分 "写代码"/"控制机器人"/"教学"</td><td><b>L2</b> profile</td></tr>
+      <tr><td>换机器 / 给团队成员预装 hermes</td><td><b>L3</b> backup+import</td></tr>
+      <tr><td>多设备<em>同时</em>用且要看到一致的学生画像</td><td><b>L4</b> honcho</td></tr>
+      <tr><td>每天自动备份到云</td><td><b>L3</b> backup + cron</td></tr>
+      <tr><td>手机 + 笔记本 + NUC 同时给一个学生用</td><td><b>L4</b> honcho（必须）</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============ § 8 ============ -->
+<section id="implications">
+  <div class="wrap">
+    <div class="num">§ 8</div>
+    <h2>对机器人 + 教育场景的实操</h2>
+
+    <h3>1. 你大概率 1 个 L4 + 1 个 L2 就够了</h3>
+    <p><b>L4 honcho</b>：NUC（机器人控制）+ 笔记本（备课/调试）+ 飞书客户端（学生/老师提问）共享同一份 user model。学情画像、错例库、用户偏好<em>实时一致</em>。</p>
+    <p><b>L2 profile</b>：同一台 NUC 上分 2 个 profile——"tutor"（教学场景，默认开 honcho）和 "dev"（开发场景，关闭 honcho 避免被学生历史污染）。</p>
+
+    <h3>2. L1 不推荐</h3>
+    <p>在你的 NUC + Spark 机器人（如果真接）之间，<em>SQLite 文件共享</em>几乎肯定踩坑。建议<em>直接跳到 L4</em>。</p>
+
+    <h3>3. L3 用作"每周快照"</h3>
+    <p>设个 cron 每周日凌晨跑 <span class="mono">hermes backup --quick</span>，zip 丢到 ~/hermes-snapshots/，万一配置搞坏了能回滚。</p>
+
+    <h3>4. 时间线</h3>
+    <ul>
+      <li><b>立即</b>：L2 profile 切分 "tutor" / "dev"</li>
+      <li><b>第 1 周末</b>：注册 honcho.ai，配 L4</li>
+      <li><b>第 2 周</b>：设 L3 backup cron（每周一次）</li>
+      <li><b>不推荐</b>：L1 共享目录（除非你确认不会同时跑）</li>
+    </ul>
+
+    <div class="callout q">
+      <b>回到主阅读手册：</b>这个附录回答的"共享"问题，跟之前的"长期记忆"和"技能沉淀"是正交的——L1-L4 是"<em>数据放在哪</em>"，"长期记忆 / 技能沉淀"是"<em>数据怎么被用</em>"。<br>
+      组合起来：L4 honcho 提供"跨设备学情同步"，长期记忆 FTS5 提供"对话检索"，技能沉淀提供"自动学习"。这三层不冲突，是 <em>互补的</em>。
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="row">
+      <div>附录 C · 源码级解析 · 2026.06.13</div>
+      <div>回 <a href="../">主阅读手册</a> · 附录 <a href="./index.html">A：FTS5</a> · <a href="./appendix-b-skills.html">B：技能沉淀</a></div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
