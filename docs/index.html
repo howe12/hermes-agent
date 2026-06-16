@@ -441,7 +441,7 @@ LIMIT <span class="v">10</span></pre>
   <div class="wrap">
     <div class="num">§ 7</div>
     <h2>中文怎么办 · trigram 分词器</h2>
-    <p>这一节是 Hermes 对我们项目最关键的部分——因为你的 7 门课几乎全是中文。</p>
+    <p>这一节是 Hermes 对我们项目最关键的部分——因为你的课程库几乎全是中文。</p>
 
     <h3>问题：默认 FTS5 对中文不友好</h3>
     <p>FTS5 默认用 <span class="mono">unicode61</span> 分词器，规则很简单：按 Unicode 类别切词。但中文每个字都是独立 token：</p>
@@ -494,7 +494,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts_trigram USING fts5(
     </ul>
 
     <div class="callout ok">
-      <b>对我们的意义：</b>你的 7 门课如果是中文，<b>搜"机械臂挥手"在 Hermes 里能精准命中</b>，不会拆字失败。trigram 索引体积大 ~2 倍（多了重叠的 3-gram），但 7 门课总量也就几 MB，磁盘无压力。
+      <b>对我们的意义：</b>你的课程库如果是中文，<b>搜"机械臂挥手"在 Hermes 里能精准命中</b>，不会拆字失败。trigram 索引体积大 ~2 倍（多了重叠的 3-gram），但课程库总量也就几 MB 到几十 MB，磁盘无压力。</p>
     </div>
   </div>
 </section>
@@ -600,9 +600,10 @@ CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts_trigram USING fts5(
     <h2>对我们的项目意味着什么</h2>
     <p>读完这一篇，你对 aquarius-psyche 项目能做的判断是：</p>
 
-    <h3>1. 7 门课接进 Hermes 的可行性 ✅</h3>
-    <p>7 门课总量预估几十 MB。每节课拆成 100-500 个 chunk，<b>7 × 300 ≈ 2100 chunk</b>。<br>
-    塞进 messages_fts 索引，<b>~10MB 索引文件</b>，每次查询 <b>5-20ms</b>。<br>
+    <h3>1. 课程库接进 Hermes 的可行性 ✅</h3>
+    <p>课程库总量预估几十 MB。每节课拆成 100-500 个 chunk，<b>以每门课约 300 chunk 估算</b>。<br>
+    7 门课 <b>≈ 2,100 chunk</b>；50 门课 <b>≈ 15,000 chunk</b>。<br>
+    全部塞进 messages_fts 索引，<b>~10-100MB 索引文件</b>，每次查询 <b>5-20ms</b>。<br>
     <b>够用，不卡。</b></p>
 
     <h3>2. 错例库能撑多久 ✅</h3>
@@ -613,10 +614,10 @@ CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts_trigram USING fts5(
 
     <h3>3. 跟 ChromaDB 怎么分工</h3>
     <p>Hermes 自带 FTS5 处理<em>对话历史</em>，<b>不需要</b>ChromaDB。<br>
-    <b>但是</b>——7 门课是<em>静态知识</em>，不是对话历史。两种方案：</p>
+    <b>但是</b>——课程库是<em>静态知识</em>，不是对话历史。两种方案：</p>
     <ul>
-      <li><b>方案 A（轻）</b>：把 7 门课当"超大 MEMORY.md"塞进 FTS5 索引。简单、零依赖。</li>
-      <li><b>方案 B（重）</b>：用 ChromaDB 单独索引 7 门课，<em>学嵌入向量</em>。能搜"意思相近"的内容，不只"包含关键词"。</li>
+      <li><b>方案 A（轻）</b>：把课程库当"超大 MEMORY.md"塞进 FTS5 索引。简单、零依赖。</li>
+      <li><b>方案 B（重）</b>：用 ChromaDB 单独索引课程库，<em>学嵌入向量</em>。能搜"意思相近"的内容，不只"包含关键词"。</li>
     </ul>
     <p>建议：<b>先 A 跑通，再 B</b>。A 用 Hermes 自带能力，<em>不增加任何依赖</em>，就能让你看到 80% 的效果。</p>
 
