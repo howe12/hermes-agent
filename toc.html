@@ -161,296 +161,43 @@ footer a { color: var(--ink-2); }
 </head>
 <body>
 
-<!-- ============ 全局顶部导航条 ============ -->
-<nav class="topnav" id="topnav">
-  <div class="topnav-inner">
-    <span class="topnav-logo"><span class="dot"></span>aquarius-psyche</span>
-    <a href="./" class="topnav-tab home">📖 主阅读手册</a>
-    <a href="./docs/index.html" class="topnav-tab appA">📎 附录 A</a>
-    <a href="./docs/appendix-b-skills.html" class="topnav-tab appB">📎 附录 B</a>
-    <a href="./docs/appendix-c-sharing.html" class="topnav-tab appC">📎 附录 C</a>
-    <a href="./toc.html" class="topnav-tab toc active">📚 目录</a>
-    <span class="topnav-spacer"></span>
-    <span class="topnav-meta">水瓶之魂 · v0.16.0</span>
+<!-- ============ 全局顶部导航条（aquarius-psyche 统一） ============ -->
+<nav class="holo-topnav" id="holo-topnav" style="position:sticky;top:0;z-index:100;background:rgba(250,250,247,0.92);backdrop-filter:saturate(180%) blur(12px);-webkit-backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid #d6d4c8;box-shadow:0 1px 0 rgba(0,0,0,0.02);">
+  <div style="max-width:1080px;margin:0 auto;padding:0 28px;display:flex;align-items:center;gap:4px;height:56px;overflow-x:auto;">
+    <span style="font-weight:700;color:#0f172a;margin-right:12px;white-space:nowrap;font-size:15px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#1e6091,#5b21b6);margin-right:6px;vertical-align:middle;"></span>aquarius-psyche</span>
+      <a href="index.html" class="topnav-tab home">📖 主阅读手册</a>
+      <a href="docs/index.html" class="topnav-tab appA">📎 附录 A</a>
+      <a href="docs/appendix-b-skills.html" class="topnav-tab appB">📎 附录 B</a>
+      <a href="docs/appendix-c-sharing.html" class="topnav-tab appC">📎 附录 C</a>
+      <a href="toc.html" class="topnav-tab toc active">📚 目录</a>
+    <span style="flex:1;"></span>
+    <span style="color:#94a3b8;font-size:12px;white-space:nowrap;padding-left:8px;">水瓶之魂 · v0.16.0</span>
   </div>
 </nav>
-<div class="progress" id="progress"></div>
+<div class="holo-progress" id="holo-progress" style="position:fixed;top:56px;left:0;height:2px;background:linear-gradient(90deg,#1e6091,#5b21b6,#a04a1d);width:0%;z-index:99;transition:width .1s ease-out;"></div>
 
 <!-- 浮动按钮 -->
-<a href="#top" class="fab fab-top" title="回到顶部" aria-label="回到顶部">↑</a>
-<a href="./toc.html" class="fab fab-toc" title="总目录" aria-label="总目录">📚</a>
-
-<!-- ============ Hero ============ -->
-<header class="hero" id="top">
-  <div class="wrap">
-    <div class="hero-eyebrow">📚 总目录 · sitemap</div>
-    <h1>4 个页面 · 78 个章节锚点 · 一键跳转</h1>
-    <p class="hero-sub">
-      aquarius-psyche 教学手册的<em>顶层目录</em>。每张卡片对应一篇正文，点击章节直接跳转到该章节；顶部导航条 4 tab 永久可见，每个页面都能秒切。
-    </p>
-    <div class="hero-meta">
-      <span class="pill">4 页面</span>
-      <span class="pill">78 章节</span>
-      <span class="pill">MIT 协议</span>
-      <span class="pill">基于 NousResearch/hermes-agent</span>
-      <span class="pill">最后更新 2026.06.16</span>
-    </div>
-  </div>
-</header>
-
-<!-- ============ 4 张页面卡片 ============ -->
-<main>
-<div class="wrap">
-<div class="pages-grid">
-
-  <!-- ==== 主阅读手册 ==== -->
-  <article class="page-card" id="card-home">
-    <div class="page-card-head">
-      <span class="page-card-icon">📖</span>
-      <div>
-        <h2 class="page-card-title">主阅读手册</h2>
-        <div class="page-card-sub">Hermes × 机器人 × 你的课程 · 整体介绍 + 4 个开放问题</div>
-      </div>
-      <span class="page-card-tag tag-home">入门</span>
-    </div>
-    <div class="page-card-body">
-      <ul class="chapter-list">
-        <li><a href="./#preface"><span class="num">§ 0</span>你可能的 3 个困惑</a></li>
-        <li class="l3"><a href="./#preface"><span class="num"></span>读这页之前，你心里可能在想</a></li>
-        <li><a href="./#hermes"><span class="num">§ 1</span>Hermes 是什么</a></li>
-        <li class="l3"><a href="./#hermes"><span class="num"></span>它解决了什么</a></li>
-        <li class="l3"><a href="./#hermes"><span class="num"></span>和其他框架的差异</a></li>
-        <li class="l3"><a href="./#hermes"><span class="num"></span>一次完整调用会发生什么</a></li>
-        <li><a href="./#integrate"><span class="num">§ 2</span>怎么把机器人接进来</a></li>
-        <li class="l3"><a href="./#integrate"><span class="num"></span>方式 A · 让 Hermes 跑</a></li>
-        <li class="l3"><a href="./#integrate"><span class="num"></span>方式 B · SKILL.md（推荐）</a></li>
-        <li class="l3"><a href="./#integrate"><span class="num"></span>方式 C · MCP server</a></li>
-        <li class="l3"><a href="./#integrate"><span class="num"></span>方式 D · 改 core（不推荐）</a></li>
-        <li class="l3"><a href="./#integrate"><span class="num"></span>怎么选</a></li>
-        <li class="l3"><a href="./#integrate"><span class="num"></span>一个具体的场景走一遍</a></li>
-        <li><a href="./#courses"><span class="num">§ 3</span>用你的课程库能讲什么</a></li>
-        <li class="l3"><a href="./#courses"><span class="num"></span>目前课程库分 3 类</a></li>
-        <li class="l3"><a href="./#courses"><span class="num"></span>每门课怎么落进 agent</a></li>
-        <li class="l3"><a href="./#courses"><span class="num"></span>一节课的剧本</a></li>
-        <li><a href="./#open"><span class="num">§ 4</span>我需要你回答的 4 个问题</a></li>
-        <li><a href="./#refs"><span class="num">§ 5</span>想再深入读什么</a></li>
-        <li class="l3"><a href="./#refs"><span class="num"></span>15 分钟 / 1 小时 / 半天</a></li>
-      </ul>
-    </div>
-    <div class="page-card-foot">
-      <span>22 个章节锚点</span>
-      <a href="./" class="btn-jump home">跳到主页 →</a>
-    </div>
-  </article>
-
-  <!-- ==== 附录 A · FTS5 ==== -->
-  <article class="page-card" id="card-appA">
-    <div class="page-card-head">
-      <span class="page-card-icon">📎</span>
-      <div>
-        <h2 class="page-card-title">附录 A · Hermes 长期记忆</h2>
-        <div class="page-card-sub">SQLite FTS5 全解 · 源码级 · 含真实 DDL/Trigger/BM25/trigram</div>
-      </div>
-      <span class="page-card-tag tag-appA">源码</span>
-    </div>
-    <div class="page-card-body">
-      <ul class="chapter-list">
-        <li><a href="./docs/index.html#what"><span class="num">§ 1</span>"长"和"快"各自指什么</a></li>
-        <li><a href="./docs/index.html#three"><span class="num">§ 2</span>3 层架构 · 短 / 中 / 长期</a></li>
-        <li class="l3"><a href="./docs/index.html#three"><span class="num"></span>当用户问"上次我们聊到哪了"</a></li>
-        <li><a href="./docs/index.html#sqlite"><span class="num">§ 3</span>SQLite FTS5 是什么 · 跟普通 LIKE 比</a></li>
-        <li class="l3"><a href="./docs/index.html#sqlite"><span class="num"></span>用 LIKE 搜索 10 万条的灾难</a></li>
-        <li class="l3"><a href="./docs/index.html#sqlite"><span class="num"></span>FTS5 倒排索引 O(log N)</a></li>
-        <li><a href="./docs/index.html#schema"><span class="num">§ 4</span>Hermes 怎么建表（带真实 DDL）</a></li>
-        <li class="l3"><a href="./docs/index.html#schema"><span class="num"></span>逐行解释</a></li>
-        <li class="l3"><a href="./docs/index.html#schema"><span class="num"></span>被索引的字段</a></li>
-        <li><a href="./docs/index.html#trigger"><span class="num">§ 5</span>Trigger 怎么让记忆"自动同步"</a></li>
-        <li><a href="./docs/index.html#bm25"><span class="num">§ 6</span>查询为什么快 · BM25 排名</a></li>
-        <li class="l3"><a href="./docs/index.html#bm25"><span class="num"></span>3 个评分维度</a></li>
-        <li class="l3"><a href="./docs/index.html#bm25"><span class="num"></span>FTS5 的查询语法</a></li>
-        <li><a href="./docs/index.html#cjk"><span class="num">§ 7</span>中文怎么办 · trigram 分词器</a></li>
-        <li class="l3"><a href="./docs/index.html#cjk"><span class="num"></span>问题：默认对中文不友好</a></li>
-        <li class="l3"><a href="./docs/index.html#cjk"><span class="num"></span>解决：trigram 分词器</a></li>
-        <li class="l3"><a href="./docs/index.html#cjk"><span class="num"></span>代码里怎么选择走哪张表</a></li>
-        <li><a href="./docs/index.html#safety"><span class="num">§ 8</span>查询安全 · sanitize</a></li>
-        <li><a href="./docs/index.html#full-flow"><span class="num">§ 9</span>一次完整写入 + 检索的全流程</a></li>
-        <li class="l3"><a href="./docs/index.html#full-flow"><span class="num"></span>阶段 1 写入</a></li>
-        <li class="l3"><a href="./docs/index.html#full-flow"><span class="num"></span>阶段 2 检索</a></li>
-        <li class="l3"><a href="./docs/index.html#full-flow"><span class="num"></span>总耗时</a></li>
-        <li><a href="./docs/index.html#implications"><span class="num">§ 10</span>对我们的项目意味着什么</a></li>
-        <li class="l3"><a href="./docs/index.html#implications"><span class="num"></span>课程库接进 Hermes 可行性</a></li>
-        <li class="l3"><a href="./docs/index.html#implications"><span class="num"></span>错例库能撑多久</a></li>
-        <li class="l3"><a href="./docs/index.html#implications"><span class="num"></span>跟 ChromaDB 怎么分工</a></li>
-        <li class="l3"><a href="./docs/index.html#implications"><span class="num"></span>还能扩展什么</a></li>
-      </ul>
-    </div>
-    <div class="page-card-foot">
-      <span>22 个章节锚点</span>
-      <a href="./docs/index.html" class="btn-jump appA">跳到附录 A →</a>
-    </div>
-  </article>
-
-  <!-- ==== 附录 B · 技能沉淀 ==== -->
-  <article class="page-card" id="card-appB">
-    <div class="page-card-head">
-      <span class="page-card-icon">📎</span>
-      <div>
-        <h2 class="page-card-title">附录 B · Hermes 技能沉淀</h2>
-        <div class="page-card-sub">持续学习的真正机制 · 2 个触发点 · 4 类信号 · 完整 PID 抖动案例</div>
-      </div>
-      <span class="page-card-tag tag-appB">源码</span>
-    </div>
-    <div class="page-card-body">
-      <ul class="chapter-list">
-        <li><a href="./docs/appendix-b-skills.html#why"><span class="num">§ 1</span>为什么"技能沉淀"才是持续学习</a></li>
-        <li><a href="./docs/appendix-b-skills.html#triggers"><span class="num">§ 2</span>2 个独立触发点 · 一热一冷</a></li>
-        <li><a href="./docs/appendix-b-skills.html#trigger1"><span class="num">§ 3</span>触发 1 · 每轮对话后 · 后台线程</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#trigger1"><span class="num"></span>3 个 AND 条件</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#trigger1"><span class="num"></span>关键的"它不动用户"</a></li>
-        <li><a href="./docs/appendix-b-skills.html#trigger2"><span class="num">§ 4</span>触发 2 · CLI 启动时 · curator 清理</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#trigger2"><span class="num"></span>3 个默认常量</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#trigger2"><span class="num"></span>自动状态转移</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#trigger2"><span class="num"></span>关键不变式</a></li>
-        <li><a href="./docs/appendix-b-skills.html#prompt"><span class="num">§ 5</span>_SKILL_REVIEW_PROMPT 全文与解读</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#prompt"><span class="num"></span>3 个隐含的设计哲学</a></li>
-        <li><a href="./docs/appendix-b-skills.html#priority"><span class="num">§ 6</span>4 种更新方式 · 优先级</a></li>
-        <li><a href="./docs/appendix-b-skills.html#signals"><span class="num">§ 7</span>4 类信号 · 任意一个就动手</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#signals"><span class="num"></span>信号 1 用户纠正风格/格式</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#signals"><span class="num"></span>信号 2 用户纠正工作流</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#signals"><span class="num"></span>信号 3 非平凡技术/修复</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#signals"><span class="num"></span>信号 4 已加载 skill 是错的</a></li>
-        <li><a href="./docs/appendix-b-skills.html#case"><span class="num">§ 8</span>完整案例 · 机械臂 PID 抖动</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#case"><span class="num"></span>对话上下文</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#case"><span class="num"></span>触发 1 跑完一轮后</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#case"><span class="num"></span>写盘的 4 选 1 决策</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#case"><span class="num"></span>写盘后的实际产物</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#case"><span class="num"></span>下次类似场景</a></li>
-        <li><a href="./docs/appendix-b-skills.html#guardrails"><span class="num">§ 9</span>3 道保险 · 防误伤</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#guardrails"><span class="num"></span>人审流程（write_approval）</a></li>
-        <li><a href="./docs/appendix-b-skills.html#implications"><span class="num">§ 10</span>对机器人 + 课程库的实操影响</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#implications"><span class="num"></span>你不用手写 skill</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#implications"><span class="num"></span>你应该写什么</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#implications"><span class="num"></span>错例库怎么搭</a></li>
-        <li class="l3"><a href="./docs/appendix-b-skills.html#implications"><span class="num"></span>时间线预期</a></li>
-      </ul>
-    </div>
-    <div class="page-card-foot">
-      <span>22 个章节锚点</span>
-      <a href="./docs/appendix-b-skills.html" class="btn-jump appB">跳到附录 B →</a>
-    </div>
-  </article>
-
-  <!-- ==== 附录 C · 多实例共享 ==== -->
-  <article class="page-card" id="card-appC">
-    <div class="page-card-head">
-      <span class="page-card-icon">📎</span>
-      <div>
-        <h2 class="page-card-title">附录 C · Hermes 多实例共享</h2>
-        <div class="page-card-sub">4 种机制全解 · § 5.5 "继承"模式专治"上一代传记忆给下一代"</div>
-      </div>
-      <span class="page-card-tag tag-appC">源码</span>
-    </div>
-    <div class="page-card-body">
-      <ul class="chapter-list">
-        <li><a href="./docs/appendix-c-sharing.html#problem"><span class="num">§ 1</span>问题定义 · "共享"指什么</a></li>
-        <li><a href="./docs/appendix-c-sharing.html#matrix"><span class="num">§ 2</span>4 种机制对照矩阵</a></li>
-        <li><a href="./docs/appendix-c-sharing.html#l1"><span class="num">§ 3</span>L1 · 共享 HERMES_HOME 目录</a></li>
-        <li class="l3"><a href="./docs/appendix-c-sharing.html#l1"><span class="num"></span>实现方式 / 机制 / 场景</a></li>
-        <li><a href="./docs/appendix-c-sharing.html#l2"><span class="num">§ 4</span>L2 · hermes profile（同一台机器多实例）</a></li>
-        <li class="l3"><a href="./docs/appendix-c-sharing.html#l2"><span class="num"></span>关键命令 / 克隆模式 / 场景</a></li>
-        <li><a href="./docs/appendix-c-sharing.html#l3"><span class="num">§ 5</span>L3 · hermes backup + import（zip 整包搬家）</a></li>
-        <li class="l3"><a href="./docs/appendix-c-sharing.html#l3"><span class="num"></span>两条命令 / 包含什么 / --quick 模式</a></li>
-        <li><a href="./docs/appendix-c-sharing.html#inherit"><span class="num">§ 5.5</span>🧬 "继承"模式专章</a></li>
-        <li class="l3"><a href="./docs/appendix-c-sharing.html#inherit-script-1"><span class="num"></span>剧本 1 · 同机 profile 轮换</a></li>
-        <li class="l3"><a href="./docs/appendix-c-sharing.html#inherit-script-2"><span class="num"></span>剧本 2 · 跨设备 NUC→笔记本</a></li>
-        <li class="l3"><a href="./docs/appendix-c-sharing.html#inherit-script-3"><span class="num"></span>剧本 3 · cron 每周快照</a></li>
-        <li><a href="./docs/appendix-c-sharing.html#l4"><span class="num">§ 6</span>L4 · 共享 honcho 后端（云端实时同步）</a></li>
-        <li class="l3"><a href="./docs/appendix-c-sharing.html#l4"><span class="num"></span>honcho 是什么 / 怎么共享 / peer card</a></li>
-        <li><a href="./docs/appendix-c-sharing.html#which"><span class="num">§ 7</span>怎么选 · 决策流程</a></li>
-        <li><a href="./docs/appendix-c-sharing.html#implications"><span class="num">§ 8</span>对机器人 + 教育场景的实操</a></li>
-        <li class="l3"><a href="./docs/appendix-c-sharing.html#implications"><span class="num"></span>1 个 L4 + 1 个 L2 就够了</a></li>
-        <li class="l3"><a href="./docs/appendix-c-sharing.html#implications"><span class="num"></span>L3 用作"每周快照"</a></li>
-      </ul>
-    </div>
-    <div class="page-card-foot">
-      <span>12 个章节锚点（含 § 5.5 专章）</span>
-      <a href="./docs/appendix-c-sharing.html" class="btn-jump appC">跳到附录 C →</a>
-    </div>
-  </article>
-
-</div>
-</div>
-
-<!-- ============ Legend / 颜色编码 ============ -->
-<section class="legend">
-  <div class="wrap">
-    <h2>🎨 颜色编码 · 一眼看出"这是哪类内容"</h2>
-    <div class="legend-grid">
-      <div class="legend-item" style="border-left: 4px solid var(--accent);">
-        <strong>🔵 蓝色 · 主线 / 入门</strong>
-        主阅读手册 + 附录 A：偏概念、偏"快速看懂"
-      </div>
-      <div class="legend-item" style="border-left: 4px solid var(--warm);">
-        <strong>🟠 橙色 · 持续学习 / 自动化</strong>
-        附录 B：技能沉淀 / curator 触发 / 人审机制
-      </div>
-      <div class="legend-item" style="border-left: 4px solid var(--purple);">
-        <strong>🟣 紫色 · 工程 / 部署</strong>
-        附录 C：多实例 / 共享 / 继承 / 工程小心思
-      </div>
-      <div class="legend-item" style="border-left: 4px solid var(--ink-3);">
-        <strong>⚪ 灰色 · 工具 / 元信息</strong>
-        目录页、浮动按钮、进度条、顶部 nav
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 未来扩展 · 顶层设计 ============ -->
-<section class="future">
-  <div class="wrap">
-    <h2>🛠️ 未来扩展 · 顶层设计约定</h2>
-    <p>当前是 4 页（1 主 + 3 附录），未来可能扩到 10+ 附录。按以下约定保持一致：</p>
-    <ol style="line-height: 1.9;">
-      <li><b>页面位置：</b>新增附录统一放 <code>docs/</code> 目录，命名 <code>appendix-{d,e,f,...}-{topic}.html</code></li>
-      <li><b>章节编号：</b>附录 D 起建议从 § 11 续接（§ 1-10 已被 A/B/C 占用）</li>
-      <li><b>颜色分配：</b>每个新附录从 <code>{蓝/橙/紫/绿/红}</code> 5 色调里选一个，沿用同色 tag</li>
-      <li><b>导航条：</b>每页 <code>&lt;nav class="topnav"&gt;</code> 必须含 4 tab + 1 目录按钮（<code>./toc.html</code>），高亮当前页用 <code>.active</code></li>
-      <li><b>浮动按钮：</b>每页必须含「回到顶部」+「目录」两个 fab，统一 <code>position: fixed</code> + 紫色主题</li>
-      <li><b>进度条：</b>每页顶部 <code>&lt;div class="progress"&gt;</code>，由本页底部 JS 驱动</li>
-      <li><b>目录页：</b>新增附录后，<em>只需在 toc.html 的 pages-grid 里加一张 card</em>——其他 4 页不用改</li>
-    </ol>
-    <p style="background: var(--paper-2); padding: 16px 20px; border-radius: 8px; border-left: 4px solid var(--purple); margin-top: 20px;">
-      <b>💡 工程哲学：</b>导航结构是"骨架"，内容是"肌肉"。骨架一旦定型，未来加新附录就像加一根新骨头——<em>不需要动现有结构</em>。
-    </p>
-  </div>
-</section>
-
-</main>
-
-<!-- ============ Footer ============ -->
-<footer>
-  <div class="wrap">
-    <div>
-      <span>aquarius-psyche · 水瓶之魂 · MIT License</span>
-      <span>基于 <a href="https://github.com/NousResearch/hermes-agent">NousResearch/hermes-agent</a> · 2026.06.16</span>
-    </div>
-    <div>
-      <a href="./">主阅读手册</a> · <a href="./docs/index.html">附录 A</a> · <a href="./docs/appendix-b-skills.html">附录 B</a> · <a href="./docs/appendix-c-sharing.html">附录 C</a> · <a href="./toc.html">目录</a>
-    </div>
-  </div>
-</footer>
+<a href="#holo-top" class="holo-fab holo-fab-top" title="回到顶部" aria-label="回到顶部" style="position:fixed;right:24px;bottom:64px;z-index:90;width:44px;height:44px;border-radius:50%;background:#fafaf7;border:1px solid #d6d4c8;box-shadow:0 4px 12px rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;text-decoration:none;color:#334155;transition:all .15s;font-size:18px;opacity:0.6;">↑</a>
+<a href="toc.html" class="holo-fab holo-fab-toc" title="总目录" aria-label="总目录" style="position:fixed;right:24px;bottom:120px;z-index:90;width:44px;height:44px;border-radius:50%;background:#ede9fe;border:1px solid #5b21b6;box-shadow:0 4px 12px rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;text-decoration:none;color:#5b21b6;transition:all .15s;font-size:18px;opacity:0.9;">📚</a>
 
 <script>
 // 阅读进度条
-window.addEventListener('scroll', () => {
-  const h = document.documentElement;
-  const b = document.body;
-  const max = Math.max(h.scrollHeight, b.scrollHeight) - h.clientHeight;
-  const pct = max > 0 ? (h.scrollTop || b.scrollTop) / max * 100 : 0;
-  document.getElementById('progress').style.width = pct + '%';
-});
+(function(){
+  function updateProgress(){
+    var h=document.documentElement,b=document.body;
+    var max=Math.max(h.scrollHeight,b.scrollHeight)-h.clientHeight;
+    var pct=max>0?(h.scrollTop||b.scrollTop)/max*100:0;
+    var bar=document.getElementById('holo-progress');
+    if(bar) bar.style.width=pct+'%';
+  }
+  window.addEventListener('scroll',updateProgress);
+  updateProgress();
+})();
 </script>
+
+
+
+
 
 </body>
 </html>
