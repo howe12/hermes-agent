@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Hermes 多实例共享 · 4 种机制全解 · aquarius-psyche</title>
-<meta name="description" content="4 种 Hermes 实例间共享数据的方式：profile / backup+import / honcho 共享 backend / 共享 HERMES_HOME 目录。源码级解析 + 适用场景。">
+<meta name="description" content="4 种 Hermes 实例间共享数据的方式：profile / backup+import / honcho 共享 backend / 共享 HERMES_HOME 目录。源码级解析 + 适用场景 + 继承模式专章。">
 <style>
 :root {
   --ink: #0f172a;
@@ -156,6 +156,7 @@ footer .row { display: flex; justify-content: space-between; align-items: center
         <li><a href="#l1">L1 · 共享 HERMES_HOME 目录（最朴素）</a></li>
         <li><a href="#l2">L2 · hermes profile（同一台机器多实例）</a></li>
         <li><a href="#l3">L3 · hermes backup + import（zip 整包搬家）</a></li>
+        <li><a href="#inherit">🧬 § 5.5 · "继承"模式专治"上一代传记忆给下一代"</a></li>
         <li><a href="#l4">L4 · 共享 honcho 后端（云端实时同步）</a></li>
         <li><a href="#which">怎么选 · 决策流程</a></li>
         <li><a href="#implications">对机器人 + 教育场景的实操</a></li>
@@ -440,6 +441,82 @@ _EXCLUDED_NAMES = {
     <div class="callout ok">
       <b>SQLite 一致性保护：</b>备份时 Hermes 调 <span class="mono">sqlite3.backup()</span>（行 ~140）做<em>原子快照</em>，不是粗暴 cp。这就是为什么 <span class="mono">.db-wal/.db-shm/.db-journal</span> 都被排除——它们是 SQLite 运行时 sidecar，跟 atomic snapshot 配对会出"撕裂状态"。
     </div>
+  </div>
+</section>
+
+<!-- ============ § 5.5 ============ -->
+<section id="inherit">
+  <div class="wrap">
+    <div class="num">§ 5.5</div>
+    <h2>🧬 "继承"模式 · 专治"上一代传记忆给下一代"</h2>
+    <p>如果你的诉求是 <b>"我不需要同时跑两台 hermes，只需要<em>这一代</em> hermes 退场时把记忆交给<em>下一代</em> hermes"</b>——你需要的不是"共享"，是"<b>继承</b>"。这正是 L3 <span class="mono">backup+import</span> 的<em>天然语义</em>。</p>
+
+    <div class="callout ok">
+      <b>一句话总结：</b><span class="mono">hermes backup</span> = 父节点立遗嘱 · <span class="mono">hermes import</span> = 子节点接受遗嘱。中间不依赖 honcho、不依赖云服务、不依赖 SQLite 共享。
+    </div>
+
+    <h3>3 个最常见的"继承"剧本</h3>
+
+    <div class="card" id="inherit-script-1">
+      <div class="n">📕 剧本 1</div>
+      <h3>同一台 NUC 上 · 上一代 profile → 下一代 profile</h3>
+      <p>典型场景：你今天在 NUC 上用 <span class="mono">tutor</span> profile 教学了半年，沉淀了大量学生错例、ROS2 教学脚本、机械臂调试记录。下学期你想 <em>完全重来</em>（"tutor-v2"），但 <b>想保留旧的全部记忆作为"前任教学档案"备查</b>。</p>
+      <pre><span class="c"># 1. 在旧 profile 上立遗嘱</span>
+<span class="v">$</span> hermes profile use tutor
+<span class="v">$</span> hermes backup --quick -o tutor-2026春.zip
+
+<span class="c"># 2. 克隆出一个 v2，import 旧记忆作为"地基"</span>
+<span class="v">$</span> hermes profile create tutor-v2
+<span class="v">$</span> hermes profile use tutor-v2
+<span class="v">$</span> hermes import tutor-2026春.zip --prefix inherited_</pre>
+      <p>关键在 <span class="mono">--prefix inherited_</span>——所有继承来的会话自动加前缀，<b>跟 v2 自己的新会话视觉上区分开</b>。这就是"子承父业"：<em>继承 + 独立</em>。</p>
+    </div>
+
+    <div class="card" id="inherit-script-2">
+      <div class="n">📗 剧本 2</div>
+      <h3>跨设备 · NUC 旧机 → 笔记本新机（一次性迁移）</h3>
+      <p>典型场景：你换了开发机，NUC 上的全部教学档案、机器人调试记录、课程笔记要 <em>一次性</em> 搬到笔记本。</p>
+      <pre><span class="c"># === 在 NUC（旧机）上 ===</span>
+<span class="v">$</span> hermes backup -o ~/aquarius-psyche-NUC-2026-06-16.zip
+<span class="v">$</span> scp ~/aquarius-psyche-NUC-2026-06-16.zip leo@newlaptop:~/
+
+<span class="c"># === 在笔记本（新机）上 ===</span>
+<span class="v">$</span> pip install hermes-agent            <span class="c"># 先装空壳</span>
+<span class="v">$</span> hermes import ~/aquarius-psyche-NUC-2026-06-16.zip
+<span class="v">$</span> hermes doctor                       <span class="c"># 验证</span></pre>
+      <p><b>零配置</b>。NUC 上跑了 3 个月的 hermes，<em>原封不动</em>在笔记本上复活——连 <span class="mono">MEMORY.md</span> / <span class="mono">USER.md</span> / 长期记忆库 / 技能库全带走。</p>
+    </div>
+
+    <div class="card" id="inherit-script-3">
+      <div class="n">📘 剧本 3</div>
+      <h3>自动化 · 每周 cron 拍一张"快照"，回滚用</h3>
+      <p>典型场景：你怕某次系统升级 / 误操作把 <span class="mono">~/.hermes/</span> 搞炸，想 <em>有后悔药</em>。</p>
+      <pre><span class="c"># ~/.hermes/cron.d/weekly-snapshot.cron</span>
+<span class="v">0</span> 3 * * 0 hermes backup --quick -o /mnt/nas/hermes-snapshots/$(date +\%Y\%m\%d).zip</pre>
+      <p>每周日凌晨 3 点，<em>自动</em> 把整包拍到 NAS。出问题就 <span class="mono">hermes import /mnt/nas/hermes-snapshots/20260615.zip</span>，<b>回到上周</b>。注意用 <span class="mono">--quick</span> 跳过 hermes-agent 源码目录（几百 MB）——只备份"状态 + 记忆 + 技能"。</p>
+    </div>
+
+    <h3>"继承" vs "共享" 的核心区别</h3>
+    <table>
+      <tr><th></th><th><b>共享（实时）</b></th><th><b>继承（一次性）</b></th></tr>
+      <tr><td>代表方案</td><td>L1 共享目录 / L4 honcho</td><td><b>L3 backup+import</b></td></tr>
+      <tr><td>时间模型</td><td>两台<em>同时</em>活</td><td>一台死、一台生</td></tr>
+      <tr><td>冲突处理</td><td>需要（SQLite / honcho）</td><td><b>不需要</b>（旧的冻结，新的覆盖）</td></tr>
+      <tr><td>外部依赖</td><td>L1 需 NAS · L4 需云</td><td><b>零</b>（一个 zip 文件）</td></tr>
+      <tr><td>你的场景匹配度</td><td>✗（"不需要同时"）</td><td><b>✓ 完美匹配</b></td></tr>
+    </table>
+
+    <div class="callout purple">
+      <b>对你的最优解：</b>你的诉求 = "继承"（不是"共享"） → 锁死 <b>L3 backup+import</b>。剧本 1（同机 profile 轮换）+ 剧本 3（cron 每周快照）组合用——<em>够用一辈子</em>，不需要 L1 共享目录、不需要 L4 honcho。
+    </div>
+
+    <h3>一些工程上的小心思</h3>
+    <ul>
+      <li><b>zip 加密：</b>Hermes 的 backup zip 默认<em>不加密</em>——但 zip 里有你的 <span class="mono">.env</span>（含 API key）。传给同事 / 上传云前 <em>务必</em> 手动加密码（<span class="mono">zip -e</span>）或先清理</li>
+      <li><b>排除大文件：</b>backup 默认排除 <span class="mono">hermes-agent/</span> 源码和 <span class="mono">*.log</span>，但<em>不排除</em> 视频/截图等大附件。如果你的 <span class="mono">~/.hermes/</span> 里有 10G 课程视频，backup 会变胖。可以用 <span class="mono">--exclude</span> 模式（具体参数看 <span class="mono">hermes backup --help</span>）</li>
+      <li><b>版本对齐：</b>备份的 hermes 版本 ≠ 恢复的 hermes 版本时，<em>极个别</em> 字段可能 schema 漂移。保险做法：<span class="mono">hermes doctor</span> 在 import 后跑一遍</li>
+      <li><b>跨平台：</b>Linux 备份的 zip 在 macOS 上 import <em>完全 OK</em>（Hermes 跨平台），但 Windows 上 zip 解码有点小坑——建议 NUC → 笔记本都走 Linux</li>
+    </ul>
   </div>
 </section>
 
